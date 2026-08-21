@@ -1867,6 +1867,19 @@
 # define CONF_WITH_WINDOW_ICONS 1
 #endif
 
+/*
+ * Set CONF_WITH_DESKTOP_INF_FALLBACK to 1 to support a fallback to
+ * STE+ TOS' NEWDESK.INF and ST TOS' DESKTOP.INF when EMUDESK.INF does not exist.
+ * (Provides better user experience with Atari ST disks made with TOS.)
+ */
+#ifndef CONF_WITH_DESKTOP_INF_FALLBACK
+# if CONF_ATARI_HARDWARE
+#  define CONF_WITH_DESKTOP_INF_FALLBACK 1
+# else
+#  define CONF_WITH_DESKTOP_INF_FALLBACK 0
+# endif
+#endif
+
 
 
 /****************************************

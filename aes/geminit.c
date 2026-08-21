@@ -114,6 +114,13 @@ static BOOL     bgfound;                /* 'Q' line found in EMUDESK.INF? */
 static WORD     bg[3];                  /* desktop backgrounds (1, 2, >2 planes) */
 #endif
 
+#if CONF_WITH_DESKTOP_INF_FALLBACK
+static BOOL     desktop_inf;            /* indicates legacy INF format */
+#define DESKTOP_INF()   (desktop_inf)
+#else
+#define DESKTOP_INF()   (0)
+#endif
+
 /* Some global variables: */
 
 GLOBAL WORD     totpds;
@@ -359,13 +366,32 @@ static void process_inf1(void)
             continue;
         switch(*pcurr++) {
         case 'E':               /* desktop environment, e.g. #E 3A 11 FF 02 */
-            pcurr += 6;                 /* skip over non-video preferences */
+
+            if (!DESKTOP_INF())
+                pcurr += 6;             /* emudesk.inf skip over non-video preferences */
+
             if (*pcurr == '\r')         /* no video info saved */
                 break;
 
             pcurr = scan_2(pcurr, &env1);
             pcurr = scan_2(pcurr, &env2);
             mode = MAKE_UWORD(env1, env2);
+
+            if (DESKTOP_INF())          /* desktop.inf */
+            {
+                /* convert to emudesk ST video mode */
+                switch (mode & 0x000F)
+                {
+                    default:
+                    case 1: mode = 0xFF00 | ST_LOW; break;
+                    case 2: mode = 0xFF00 | ST_MEDIUM; break;
+                    case 3: mode = 0xFF00 | ST_HIGH; break;
+                    case 4: mode = 0xFF00 | TT_LOW; break;
+                    case 5: mode = 0xFF00 | TT_MEDIUM; break;
+                    case 6: mode = 0xFF00 | TT_HIGH; break;
+                }
+            }
+
             mode = check_moderez(mode);
             if (mode == 0)              /* no change required */
                 break;
@@ -422,17 +448,21 @@ static BOOL process_inf2(BOOL *isauto)
         {                           /* desktop environment          */
             pcurr += 2;
             pcurr = scan_2(pcurr, &env);
-            ev_dclick(env & 0x07, TRUE);
+            if (!DESKTOP_INF())     /* desktop.inf does not store dclick here */
+                ev_dclick(env & 0x07, TRUE);
             pcurr = scan_2(pcurr, &env);    /* get desired blitter state */
 #if CONF_WITH_BLITTER
             if (has_blitter)
                 Blitmode((env&0x80)?1:0);
 #endif
 #if CONF_WITH_CACHE_CONTROL
-            pcurr = scan_2(pcurr, &env);    /* skip over video bytes if present */
-            pcurr = scan_2(pcurr, &env);
-            scan_2(pcurr, &env);            /* get desired cache state */
-            set_cache((env&0x08)?0:1);
+            if (!DESKTOP_INF())                 /* emudesk.inf */
+            {
+                pcurr = scan_2(pcurr, &env);    /* skip over video bytes if present */
+                pcurr = scan_2(pcurr, &env);
+                scan_2(pcurr, &env);            /* get desired cache state */
+                set_cache((env&0x08)?0:1);
+            }
 #endif
         }
         else if (tmp == 'Z')        /* something like "#Z 01 C:\THING.APP@" */
@@ -768,9 +798,37 @@ void gem_main(void)
     else
         n = readfile(INF_FILE_NAME, INF_SIZE, infbuf);
 
+#if !CONF_WITH_DESKTOP_INF_FALLBACK
     if (n < 0L)
         n = 0L;
-    infbuf[n] = '\0';           /* terminate input data */
+    infbuf[n] = '\0';               /* terminate input data */
+#else
+    desktop_inf = FALSE;
+    if (n >= 0L)
+    {
+        infbuf[n] = '\0';
+    }
+    else                            /* not found, try newdesk.inf, desktop.inf */
+    {
+        n = readfile(INF_FILE_ALT2, INF_SIZE, infbuf);
+        if (n >= 0L)                /* newdesk.inf */
+        {
+            infbuf[n] = '\0';
+            desktop_inf = TRUE;
+        }
+        else
+        {
+            n = readfile(INF_FILE_ALT1, INF_SIZE, infbuf);
+            if (n >= 0L)            /* desktop.inf */
+            {
+                infbuf[n] = '\0';
+                desktop_inf = TRUE;
+            }
+            else
+                infbuf[0] = '\0';   /* empty file */
+        }
+    }
+#endif
 
     if (!gl_changerez)          /* can't be here because of rez change,       */
         process_inf1();         /*  so see if .inf says we need to change rez */

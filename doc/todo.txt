@@ -14,6 +14,5 @@ AES
 
 DESK
 - Add a dialog for configuring the NVRAM (keyboard, languages, ...)
-- Support for loading DESKTOP.INF?NEWDESK.INF? (needs remapping of the icon indexes)
 
 CLI
