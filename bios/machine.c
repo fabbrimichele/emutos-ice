@@ -828,6 +828,8 @@ const char * machine_name(void)
     MAYBE_UNUSED(guess_machine_name);
 #ifdef MACHINE_FIREBEE
     return "FireBee";
+#elif defined(MACHINE_RT68ICE)
+    return "rt68ice";    
 #elif defined(MACHINE_AMIGA)
     return amiga_machine_name();
 #elif defined(MACHINE_LISA)

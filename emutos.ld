@@ -22,6 +22,9 @@ OUTPUT_FORMAT(binary)
 /* The ROM address depends on the target */
 #if defined(MACHINE_AMIGA)
 # define ROM_ORIGIN 0x00fc0000
+#elif defined(MACHINE_RT68ICE)
+/* For RT68ICE simulate ROM in RAM, when not using EMUTOS_LIVES_IN_RAM */
+# define ROM_ORIGIN 0x00780000
 #elif defined(TARGET_CART)
 # define ROM_ORIGIN 0x00fa0000
 #elif defined(TARGET_192)

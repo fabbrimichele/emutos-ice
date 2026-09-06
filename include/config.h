@@ -563,6 +563,83 @@
 #endif
 
 /*
+ * Defaults for the RT68ICE IMG target
+ */
+#ifdef TARGET_RT68ICE_IMG
+# define MACHINE_RT68ICE
+#endif
+
+/*
+ * Defaults for the RT68ICE machine
+ */
+#ifdef MACHINE_RT68ICE
+# ifndef CONF_ATARI_HARDWARE
+#  define CONF_ATARI_HARDWARE 0
+# endif
+/* I couldn't understand why but without the machine can't recover 
+   from stop, even when interrupts are apparently enabled. */
+# ifndef USE_STOP_INSN_TO_FREE_HOST_CPU
+#  define USE_STOP_INSN_TO_FREE_HOST_CPU 0
+# endif
+# ifndef CONF_WITH_FLEXCAN
+#  define CONF_WITH_FLEXCAN 0
+# endif
+# ifndef CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF
+#  define CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF 0
+# endif
+/* TODO: try CONF_WITH_BUS_ERROR 1 */
+# ifndef CONF_WITH_BUS_ERROR
+#  define CONF_WITH_BUS_ERROR 0
+# endif
+/* TODO: configure size and planes */
+# ifndef CONF_VRAM_ADDRESS
+#  define CONF_VRAM_ADDRESS 0x00E00000
+# endif
+# ifndef CONF_STRAM_SIZE
+#  define CONF_STRAM_SIZE (7 * 1024 + 512) * 1024
+# endif
+
+/* TODO: */
+/*
+# ifndef CONF_WITH_SDMMC
+#  define CONF_WITH_SDMMC 1
+# endif
+*/
+/*
+# ifndef CONF_WITH_YM2149                        
+#  define CONF_WITH_YM2149 1                            
+# endif
+*/
+
+/* The ones below are not needed in normale scenarios */
+/*
+# ifndef EMUTOS_LIVES_IN_RAM
+#  define EMUTOS_LIVES_IN_RAM 1
+# endif
+*/
+/* TODO: I'm not sure this correct, it uses Atari ST MFP (MC68901)
+# ifndef RS232_DEBUG_PRINT
+#  define RS232_DEBUG_PRINT 1
+# endif
+*/
+/* TODO: This might not be the correct way to set it, see COLDFIRE_DEBUG_PRINT*/
+/*
+# ifndef RT68ICE_DEBUG_PRINT
+#  define RT68ICE_DEBUG_PRINT
+# endif
+*/
+/* CONF_SERIAL_CONSOLE 1 is required by KDEBUG */
+/*
+# ifndef CONF_SERIAL_CONSOLE
+#  define CONF_SERIAL_CONSOLE 1
+# endif
+# ifndef ENABLE_KDEBUG
+#  define ENABLE_KDEBUG
+# endif
+*/
+#endif
+
+/*
  * Defaults for the Amiga ROM target
  */
 #ifdef TARGET_AMIGA_ROM

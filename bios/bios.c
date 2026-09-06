@@ -60,6 +60,7 @@
 #include "memory.h"
 #include "nova.h"
 #include "tosvars.h"
+#include "rt68ice.h"
 #include "amiga.h"
 #include "lisa.h"
 #include "coldfire.h"
@@ -227,6 +228,10 @@ static void bios_init(void)
 #if CONF_WITH_UAE
     KDEBUG(("amiga_uae_init()\n"));
     amiga_uae_init();
+#endif
+#if defined(MACHINE_RT68ICE)
+    KDEBUG(("rt68ice_init()\n"));
+    rt68ice_init();
 #endif
 
     /* Initialize the processor */

@@ -306,6 +306,7 @@ bios_src +=  memory.S processor.S vectors.S aciavecs.S bios.c xbios.c acsi.c \
              parport.c screen.c serport.c sound.c videl.c vt52.c xhdi.c \
              pmmu030.c 68040_pmmu.S \
              amiga.c amiga2.S spi_vamp.c \
+			 rt68ice.c \
              lisa.c lisa2.S \
              delay.c delayasm.S sd.c memory2.c bootparams.c scsi.c nova.c \
              dsp.c dsp2.S \
@@ -632,6 +633,35 @@ cart:
 	$(MAKE) OPTFLAGS='$(OPTFLAGS)' DEF='$(DEF)' UNIQUE=$(COUNTRY) WITH_AES=$(WITH_AES) ROMSIZE=$(ROMSIZE) ROM_PADDED=$(ROM_PADDED) $(ROM_PADDED) REF_OS=TOS104
 	./mkrom stc emutos.img emutos.stc
 	@printf "$(LOCALCONFINFO)"
+
+#
+# rt68ice Image
+#
+TOCLEAN += *.img
+
+IMG_RT68ICE = emutos-rt68ice.img
+RT68ICE_DEFS =
+LOAD_ADDRESS := 00780000 # 8MB - 512KB ( = EmuTOS dedicated space)
+
+.PHONY: rt68ice
+NODEP += rt68ice
+rt68ice: UNIQUE = $(COUNTRY)
+rt68ice: OPTFLAGS = $(SMALL_OPTFLAGS)
+rt68ice: override DEF += -DTARGET_RT68ICE_IMG $(RT68_DEFS)
+rt68ice: WITH_AES=0	# Switch graphic UI off
+rt68ice: WITH_CLI=1	# Switch console on
+rt68ice:
+	@echo "# Building rt68ice EmuTOS into $(IMG_RT68ICE)"
+	$(MAKE) CPUFLAGS='$(CPUFLAGS)' DEF='$(DEF)' OPTFLAGS='$(OPTFLAGS)' UNIQUE=$(UNIQUE) IMG_RT68ICE=$(IMG_RT68ICE) $(IMG_RT68ICE) REF_OS=TOS206
+	@printf "$(LOCALCONFINFO)"
+
+# Creates the img file in the format expected by the rt68ice bootloader
+$(IMG_RT68ICE): emutos.img mkrom
+	SHELL_RAW_FILE="emutos.img"; \
+	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
+	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
+	HEADER_HEX="$(LOAD_ADDRESS)"$$HEX_SIZE; \
+	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $(IMG_RT68ICE)
 
 #
 # Amiga Image
