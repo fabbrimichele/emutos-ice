@@ -595,8 +595,9 @@
 # ifndef CONF_VRAM_ADDRESS
 #  define CONF_VRAM_ADDRESS 0x00E00000
 # endif
+/* 7.5 MB RAM of free RAM, 512 KB are used as ROM */
 # ifndef CONF_STRAM_SIZE
-#  define CONF_STRAM_SIZE (7 * 1024 + 512) * 1024
+#  define CONF_STRAM_SIZE 7680 * 1024UL
 # endif
 
 /* TODO: */
@@ -629,14 +630,12 @@
 # endif
 */
 /* CONF_SERIAL_CONSOLE 1 is required by KDEBUG */
-/*
 # ifndef CONF_SERIAL_CONSOLE
 #  define CONF_SERIAL_CONSOLE 1
 # endif
 # ifndef ENABLE_KDEBUG
 #  define ENABLE_KDEBUG
 # endif
-*/
 #endif
 
 /*
