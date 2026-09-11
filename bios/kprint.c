@@ -232,7 +232,7 @@ static int vkprintf(const char *fmt, va_list ap)
 #endif
 
 #ifdef MACHINE_RT68ICE
-    return doprintf(kprintf_outc_rt68f_rs232, fmt, ap);
+    return doprintf(kprintf_outc_rt68ice_rs232, fmt, ap);
 #endif
 
 #if DETECT_NATIVE_FEATURES

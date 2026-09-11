@@ -61,18 +61,22 @@ I could also implement 1280x960 1 plan in the FPGA.
 /******************************************************************************/
 /* RS232                                                                      */
 /******************************************************************************/
-void rt68f_rs232_init(void) 
+
+// TODO: replace rt68ice with rt68ice everywhere
+
+
+void rt68ice_rs232_init(void) 
 {
     // Main settings inhereted from boot loader
 
-    VEC_LEVEL3 = rt68f_rs232_int; // Set interrupt handler
+    VEC_LEVEL3 = rt68ice_rs232_int; // Set interrupt handler
     UART_IER = UART_IER_INT_RHR;  // Enable interrupt on receive holding register
 
     // Debug
     LEDS = 0x2;
 }
 
-void rt68f_rs232_int_c(void) 
+void rt68ice_rs232_int_c(void) 
 {
     // Debug
     LEDS = 0x3;
@@ -83,58 +87,36 @@ void rt68f_rs232_int_c(void)
     push_serial_iorec(UART_RBR); // Read and push serial input byte    
 }
 
-
-BOOL rt68f_rs232_can_write(void)
+BOOL rt68ice_rs232_can_write(void)
 {
     // Debug
     LEDS = 0x4;
-
-    /*
-    TODO: it stopped here, perhaps the serial is not configured properly?
-          or it's accessing the wrong addresses?
-          Check if the access is byte or word oriented and compare it with the RT68F    
-    
-    UART_IER_INT_RHR        0x01; // Enable interrupt on receive holding register
-    UART_LSR_THE            0x20; // Transmission Holding Empty
-
-    Below a working asm code:
-        put_chr:
-        movem.l d1,-(sp)
-    .wait:
-        move.b  UART_LSR,d1
-        btst    #5,d1   		; write buffer empty?
-        beq     .wait    		; eq 0, not ready, check again
-        move.b  d0,UART_RBR		; write d0 to serial
-        movem.l (sp)+,d1
-        rts						; return
-    */
-
 
     // Check if space is available in the FIFO
     return UART_LSR & UART_LSR_THE; // Transmission Holding Empty
 }
 
-void rt68f_rs232_write_byte(UBYTE b)
+void rt68ice_rs232_write_byte(UBYTE b)
 {
     // Debug
     LEDS = 0x5;
 
-    while (!rt68f_rs232_can_write()); // Wait
+    while (!rt68ice_rs232_can_write()); // Wait
     
     // Send the byte
     UART_RBR = (UWORD)b;
 }
 
-void kprintf_outc_rt68f_rs232(int c)
+void kprintf_outc_rt68ice_rs232(int c)
 {
     // Debug
     LEDS = 0x6;
 
     // Raw terminals usually require CRLF 
     if ( c == '\n')
-        rt68f_rs232_write_byte('\r');
+        rt68ice_rs232_write_byte('\r');
 
-    rt68f_rs232_write_byte((char)c);
+    rt68ice_rs232_write_byte((char)c);
 }
 
 #endif /* MACHINE_RT68ICE */
