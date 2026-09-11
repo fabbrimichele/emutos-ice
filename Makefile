@@ -306,7 +306,7 @@ bios_src +=  memory.S processor.S vectors.S aciavecs.S bios.c xbios.c acsi.c \
              parport.c screen.c serport.c sound.c videl.c vt52.c xhdi.c \
              pmmu030.c 68040_pmmu.S \
              amiga.c amiga2.S spi_vamp.c \
-			 rt68ice.c \
+			 rt68ice.c rt68ice2.S \
              lisa.c lisa2.S \
              delay.c delayasm.S sd.c memory2.c bootparams.c scsi.c nova.c \
              dsp.c dsp2.S \
@@ -647,7 +647,7 @@ LOAD_ADDRESS := 00780000 # 8MB - 512KB ( = EmuTOS dedicated space)
 NODEP += rt68ice
 rt68ice: UNIQUE = $(COUNTRY)
 rt68ice: OPTFLAGS = $(SMALL_OPTFLAGS)
-rt68ice: override DEF += -DTARGET_RT68ICE_IMG $(RT68_DEFS)
+rt68ice: override DEF += -DTARGET_RT68ICE_IMG $(RT68ICE_DEFS)
 rt68ice: WITH_AES=0	# Switch graphic UI off
 rt68ice: WITH_CLI=1	# Switch console on
 rt68ice:
