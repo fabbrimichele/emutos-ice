@@ -77,30 +77,23 @@ I could also implement 1280x960 1 plan in the FPGA.
 /******************************************************************************/
 /* RS232                                                                      */
 /******************************************************************************/
-
-// TODO: replace rt68ice with rt68ice everywhere
-
-
 void rt68ice_rs232_init(void) 
 {
     // Main settings inhereted from boot loader
 
     VEC_LEVEL3 = rt68ice_rs232_int; // Set interrupt handler
     UART_IER = UART_IER_INT_RHR;    // Enable interrupt on receive holding register
-
-    // Debug
-    LEDS = 0x2;
 }
 
 void rt68ice_rs232_int_c(void) 
 {
-    // Debug
-    LEDS = 0x3;
-
     if (UART_IIR != 4) // Check received rata ready and clean interrupt
         return;        // If not Received Data Ready, return
 
-    push_serial_iorec(UART_RBR); // Read and push serial input byte    
+    // Read and push serial input byte
+    UBYTE c = UART_RBR;
+    LEDS = c;
+    push_serial_iorec(c);
 }
 
 BOOL rt68ice_rs232_can_write(void)
@@ -131,9 +124,6 @@ void kprintf_outc_rt68ice_rs232(int c)
 /******************************************************************************/
 void rt68ice_init_system_timer(void)
 {
-    // Debug
-    LEDS = 0x4;
-
     // Install the level-5 interrupt handler
     VEC_LEVEL5 = rt68ice_timer_int;
 
