@@ -107,4 +107,8 @@ extern int amiga_is_ntsc;
 WORD amiga_vgetmode(void);
 #endif
 
+#ifdef MACHINE_RT68ICE
+WORD rt68f_vgetmode(void);
+#endif
+
 #endif /* BIOSEXT_H */

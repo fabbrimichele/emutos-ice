@@ -35,6 +35,7 @@
 #include "bios.h"
 #include "bdosbind.h"
 #include "amiga.h"
+#include "rt68ice.h"
 #include "lisa.h"
 #include "nova.h"
 
@@ -413,6 +414,10 @@ WORD check_moderez(WORD moderez)
     return amiga_check_moderez(moderez);
 #endif
 
+#ifdef MACHINE_RT68ICE
+    return rt68f_check_moderez(moderez);
+#endif
+
 #if CONF_WITH_VIDEL
     if (has_videl)
         return videl_check_moderez(moderez);
@@ -625,6 +630,10 @@ void screen_init_mode(void)
     amiga_screen_init();
 #endif
 
+#ifdef MACHINE_RT68ICE
+    rt68f_screen_init();
+#endif
+
 #ifdef MACHINE_LISA
     lisa_screen_init();
 #endif
@@ -745,6 +754,8 @@ static ULONG calc_vram_size(void)
 {
 #ifdef MACHINE_AMIGA
     return amiga_initial_vram_size();
+#elif defined(MACHINE_RT68ICE)
+    return rt68f_vram_size();
 #elif defined(MACHINE_LISA)
     return 32*1024UL;
 #else
@@ -814,6 +825,8 @@ void screen_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
 
 #ifdef MACHINE_AMIGA
     amiga_get_current_mode_info(planes, hz_rez, vt_rez);
+#elif defined(MACHINE_RT68ICE)
+    rt68f_get_current_mode_info(planes, hz_rez, vt_rez);
 #elif defined(MACHINE_LISA)
     *planes = 1;
     *hz_rez = 720;
@@ -832,6 +845,8 @@ WORD get_palette(void)
 {
 #ifdef MACHINE_AMIGA
     return 2;               /* we currently only support monochrome */
+#elif defined(MACHINE_RT68ICE)
+    return rt68f_get_palette();
 #else
     WORD palette;
 
@@ -1043,6 +1058,8 @@ const UBYTE *physbase(void)
 {
 #ifdef MACHINE_AMIGA
     return amiga_physbase();
+#elif defined(MACHINE_RT68ICE)
+    return rt68f_physbase();
 #elif defined(MACHINE_LISA)
     return lisa_physbase();
 #elif CONF_WITH_ATARI_VIDEO
@@ -1061,6 +1078,8 @@ static void setphys(const UBYTE *addr)
 
 #ifdef MACHINE_AMIGA
     amiga_setphys(addr);
+#elif defined(MACHINE_RT68ICE)
+    rt68f_setphys(addr);
 #elif defined(MACHINE_LISA)
     lisa_setphys(addr);
 #elif CONF_WITH_ATARI_VIDEO
@@ -1150,6 +1169,8 @@ WORD setscreen(UBYTE *logLoc, const UBYTE *physLoc, WORD rez, WORD videlmode)
 
 #ifdef MACHINE_AMIGA
     amiga_setrez(rez, videlmode);
+#elif defined(MACHINE_RT68ICE)
+    rt68f_setrez(rez, videlmode);    
 #elif CONF_WITH_ATARI_VIDEO
     atari_setrez(rez, videlmode);
 #endif

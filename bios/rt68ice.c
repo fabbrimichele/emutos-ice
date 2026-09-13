@@ -37,14 +37,14 @@
 #define UART_LSR_THE            0x20 // Transmission Holding Empty
 
 /* Programmable timer (68000 autovector interrupt level 5) */
-#define TIMER_CONTROL       *(volatile UWORD*)(0x00f1c000)   // bit 0 enable, bit 1 auto-reload, bit 2 IRQ enable, bit 3 reload command
-#define TIMER_STATUS        *(volatile UWORD*)(0x00f1c002)   // bit 0 IRQ pending (read to clear), bit 1 running
-#define TIMER_DIVIDER_HI    *(volatile UWORD*)(0x00f1c004)   // divider bits 31-16
-#define TIMER_DIVIDER_LO    *(volatile UWORD*)(0x00f1c006)   // divider bits 15-0
-#define TIMER_RELOAD_HI     *(volatile UWORD*)(0x00f1c008)   // reload value bits 31-16
-#define TIMER_RELOAD_LO     *(volatile UWORD*)(0x00f1c00a)   // reload value bits 15-0
-#define TIMER_VALUE_HI      *(volatile UWORD*)(0x00f1c00c)   // current value bits 31-16; latches VALUE_LO
-#define TIMER_VALUE_LO      *(volatile UWORD*)(0x00f1c00e)   // latched current value bits 15-0
+#define TIMER_CONTROL       *(volatile UWORD*)(0x00f1c000) // bit 0 enable, bit 1 auto-reload, bit 2 IRQ enable, bit 3 reload command
+#define TIMER_STATUS        *(volatile UWORD*)(0x00f1c002) // bit 0 IRQ pending (read to clear), bit 1 running
+#define TIMER_DIVIDER_HI    *(volatile UWORD*)(0x00f1c004) // divider bits 31-16
+#define TIMER_DIVIDER_LO    *(volatile UWORD*)(0x00f1c006) // divider bits 15-0
+#define TIMER_RELOAD_HI     *(volatile UWORD*)(0x00f1c008) // reload value bits 31-16
+#define TIMER_RELOAD_LO     *(volatile UWORD*)(0x00f1c00a) // reload value bits 15-0
+#define TIMER_VALUE_HI      *(volatile UWORD*)(0x00f1c00c) // current value bits 31-16; latches VALUE_LO
+#define TIMER_VALUE_LO      *(volatile UWORD*)(0x00f1c00e) // latched current value bits 15-0
 
 #define TIMER_ENABLE        0x0001
 #define TIMER_AUTO_RELOAD   0x0002
@@ -52,6 +52,17 @@
 #define TIMER_RELOAD        0x0008
 #define TIMER_IRQ_PENDING   0x0001
 
+/* Screen */
+#define VIDEO_CTRL          *(volatile UWORD*)(0x00f0c000) // Resolution control
+#define VIDEO_IRQ_STATUS    *(volatile UWORD*)(0x00f0c002) // Bit 0 VBL pending; read to acknowledge
+#define VIDEO_IRQ_ENABLE    *(volatile UWORD*)(0x00f0c004) // Bit 0 VBL interrupt enable
+#define VIDEO_PLTE          *(volatile UWORD*)(0x00f08000) // Video Palette Registers
+
+#define VIDEO_IRQ_VBL       0001
+
+#define MODE_320X240_8BP   0x00  // 320x240 8 bitplanes
+#define MODE_640X240_4BP   0x01  // 640x240 4 bitplanes
+#define MODE_640X480_2BP   0x02  // 640x480 2 bitplanes
 
 
 /* Initialize Native Features */
@@ -65,14 +76,125 @@ extern void rt68ice_init(void)
 /******************************************************************************/
 /* Screen                                                                     */
 /******************************************************************************/
-// TODO
-/*
-## Screen
-Atari TT uses the same planar layout but for higher resolutions and number of colors.
-For example 640x480 16 colors (4 planes).
-I could also implement 1280x960 1 plan in the FPGA.
-*/
+static UBYTE current_screen_mode;
+//UWORD* pword_vga_palette = (UWORD *)VIDEO_PLTE;
+const UBYTE *rt68f_screenbase;
 
+/* 
+ * Initialize graphic palette and video mode 
+ */
+void rt68f_screen_init(void)
+{
+    // Set palette colors:
+    // TODO: configure palette
+    //pword_vga_palette[0] = 0x0FFF; // color 0 xRGB (white)
+    //pword_vga_palette[1] = 0x0000; // color 1 xRGB (black)
+
+    /* Set VBL interrupt routine */
+    VEC_LEVEL4 = rt68f_vbl_int;
+
+    VIDEO_IRQ_ENABLE = 0;               // Disable VGA interrupts during setup
+    (void)VIDEO_IRQ_STATUS;             // Read to clear pending IRQ
+    VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
+
+
+    /* Set screen mode and enable vblank interrupt */
+    rt68f_set_screen_mode(MODE_640X480_2BP);
+}
+
+ULONG rt68f_vram_size(void)
+{
+    return 70800UL;
+}
+
+/*
+ * returns the palette (number of colour choices) for the current hardware
+ */
+WORD rt68f_get_palette(void)
+{
+    return 2;
+}
+
+WORD  rt68f_vgetmode(void)
+{
+    return current_screen_mode;
+}
+
+void rt68f_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
+{
+    switch (current_screen_mode)
+    {
+        case MODE_320X240_8BP:
+            *hz_rez = 320;
+            *vt_rez = 240;
+            *planes = 8;
+            break;
+
+        case MODE_640X240_4BP:
+            *hz_rez = 640;
+            *vt_rez = 240;
+            *planes = 4;
+            break;
+
+        case MODE_640X480_2BP:
+            *hz_rez = 640;
+            *vt_rez = 480;
+            *planes = 2;
+            break;
+
+        default:
+            break;
+    }    
+}
+
+void rt68f_setphys(const UBYTE *addr)
+{
+    rt68f_screenbase = addr;
+}
+
+const UBYTE *rt68f_physbase(void)
+{
+    return rt68f_screenbase;
+}
+
+void rt68f_set_screen_mode(UBYTE screen_mode) 
+{
+    VIDEO_CTRL = screen_mode;
+    VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
+    current_screen_mode = screen_mode;
+}
+
+WORD rt68f_check_moderez(WORD moderez)
+{
+    return (moderez == current_screen_mode)?0:moderez;
+}
+
+/*
+    Used by setscreen function (screen.c).
+    It uses ST resolutions screen modes (low and med) but for 
+    640x400 and 640x480, this may confuse  some applications. 
+    A better approach could be the amiga one with VIDEL.
+*/
+void rt68f_setrez(WORD rez, WORD videlmode)
+{
+    switch (rez)
+    {
+        case 0:
+            rt68f_set_screen_mode(MODE_320X240_8BP);
+            break;
+
+        case 2:
+            rt68f_set_screen_mode(MODE_640X240_4BP);
+            break;
+
+        case 1:
+            rt68f_set_screen_mode(MODE_640X480_2BP);
+            break;
+
+        default:
+            break;
+    }
+}
 
 /******************************************************************************/
 /* RS232                                                                      */
