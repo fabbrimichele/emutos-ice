@@ -56,7 +56,7 @@
 #define VIDEO_CTRL          *(volatile UWORD*)(0x00f0c000) // Resolution control
 #define VIDEO_IRQ_STATUS    *(volatile UWORD*)(0x00f0c002) // Bit 0 VBL pending; read to acknowledge
 #define VIDEO_IRQ_ENABLE    *(volatile UWORD*)(0x00f0c004) // Bit 0 VBL interrupt enable
-#define VIDEO_PLTE          *(volatile UWORD*)(0x00f08000) // Video Palette Registers
+#define VIDEO_PLTE          (void *)(0x00f08000)           // Video Palette address
 
 #define VIDEO_IRQ_VBL       0001
 
@@ -77,7 +77,7 @@ extern void rt68ice_init(void)
 /* Screen                                                                     */
 /******************************************************************************/
 static UBYTE current_screen_mode;
-//UWORD* pword_vga_palette = (UWORD *)VIDEO_PLTE;
+ULONG* pword_vga_palette = (ULONG *)VIDEO_PLTE;
 const UBYTE *rt68f_screenbase;
 
 /* 
@@ -86,9 +86,10 @@ const UBYTE *rt68f_screenbase;
 void rt68f_screen_init(void)
 {
     // Set palette colors:
-    // TODO: configure palette
-    //pword_vga_palette[0] = 0x0FFF; // color 0 xRGB (white)
-    //pword_vga_palette[1] = 0x0000; // color 1 xRGB (black)
+    pword_vga_palette[0] = 0x00FFFFFF; // color 0 xxRRGGBB (white)
+    pword_vga_palette[1] = 0x00FF0000; // color 1 xxRRGGBB (red)
+    pword_vga_palette[2] = 0x0000FF00; // color 2 xxRRGGBB (green)
+    pword_vga_palette[3] = 0x00000000; // color 3 xxRRGGBB (black)
 
     /* Set VBL interrupt routine */
     VEC_LEVEL4 = rt68f_vbl_int;
@@ -96,7 +97,6 @@ void rt68f_screen_init(void)
     VIDEO_IRQ_ENABLE = 0;               // Disable VGA interrupts during setup
     (void)VIDEO_IRQ_STATUS;             // Read to clear pending IRQ
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
-
 
     /* Set screen mode and enable vblank interrupt */
     rt68f_set_screen_mode(MODE_640X480_2BP);
