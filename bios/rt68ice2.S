@@ -12,6 +12,18 @@ _rt68ice_timer_int:
         rts                             // Tail-call jump to int_timerc
 
 /******************************************************************************/
+/* Interrupt 4: VBL                                                           */
+/******************************************************************************/
+        .globl  _rt68f_vbl_int
+_rt68f_vbl_int:
+        movem.l d0-d1/a0-a1,-(sp)       // C code does not preserve these registers
+        // TODO: use VIDEO_IRQ_STATUS
+        tst.w   0x00f0c002              // Read status to acknowledge the VBL
+        jbsr    _int_vbl                // Call the standard VBL handler
+        movem.l (sp)+,d0-d1/a0-a1
+        rte
+
+/******************************************************************************/
 /* Interrupt 3: RS232                                                         */
 /******************************************************************************/
         .globl  _rt68ice_rs232_int
