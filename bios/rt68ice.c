@@ -33,9 +33,25 @@
 #define UART_LSR *(volatile UBYTE*)(0x00f0400a) // Line status register
 #define UART_MSR *(volatile UBYTE*)(0x00f0400c) // MODEM status register
 
-/* Serial Feature Bit Flags */
 #define UART_IER_INT_RHR        0x01 // Enable interrupt on receive holding register
 #define UART_LSR_THE            0x20 // Transmission Holding Empty
+
+/* Programmable timer (68000 autovector interrupt level 5) */
+#define TIMER_CONTROL       *(volatile UWORD*)(0x00f1c000)   // bit 0 enable, bit 1 auto-reload, bit 2 IRQ enable, bit 3 reload command
+#define TIMER_STATUS        *(volatile UWORD*)(0x00f1c002)   // bit 0 IRQ pending (read to clear), bit 1 running
+#define TIMER_DIVIDER_HI    *(volatile UWORD*)(0x00f1c004)   // divider bits 31-16
+#define TIMER_DIVIDER_LO    *(volatile UWORD*)(0x00f1c006)   // divider bits 15-0
+#define TIMER_RELOAD_HI     *(volatile UWORD*)(0x00f1c008)   // reload value bits 31-16
+#define TIMER_RELOAD_LO     *(volatile UWORD*)(0x00f1c00a)   // reload value bits 15-0
+#define TIMER_VALUE_HI      *(volatile UWORD*)(0x00f1c00c)   // current value bits 31-16; latches VALUE_LO
+#define TIMER_VALUE_LO      *(volatile UWORD*)(0x00f1c00e)   // latched current value bits 15-0
+
+#define TIMER_ENABLE        0x0001
+#define TIMER_AUTO_RELOAD   0x0002
+#define TIMER_IRQ_ENABLE    0x0004
+#define TIMER_RELOAD        0x0008
+#define TIMER_IRQ_PENDING   0x0001
+
 
 
 /* Initialize Native Features */
@@ -70,7 +86,7 @@ void rt68ice_rs232_init(void)
     // Main settings inhereted from boot loader
 
     VEC_LEVEL3 = rt68ice_rs232_int; // Set interrupt handler
-    UART_IER = UART_IER_INT_RHR;  // Enable interrupt on receive holding register
+    UART_IER = UART_IER_INT_RHR;    // Enable interrupt on receive holding register
 
     // Debug
     LEDS = 0x2;
@@ -89,34 +105,50 @@ void rt68ice_rs232_int_c(void)
 
 BOOL rt68ice_rs232_can_write(void)
 {
-    // Debug
-    LEDS = 0x4;
-
     // Check if space is available in the FIFO
     return UART_LSR & UART_LSR_THE; // Transmission Holding Empty
 }
 
 void rt68ice_rs232_write_byte(UBYTE b)
 {
-    // Debug
-    LEDS = 0x5;
-
     while (!rt68ice_rs232_can_write()); // Wait
     
     // Send the byte
-    UART_RBR = (UWORD)b;
+    UART_RBR = b;
 }
 
 void kprintf_outc_rt68ice_rs232(int c)
 {
-    // Debug
-    LEDS = 0x6;
-
     // Raw terminals usually require CRLF 
     if ( c == '\n')
         rt68ice_rs232_write_byte('\r');
 
     rt68ice_rs232_write_byte((char)c);
+}
+
+/******************************************************************************/
+/* Timer                                                                      */
+/******************************************************************************/
+void rt68ice_init_system_timer(void)
+{
+    // Debug
+    LEDS = 0x4;
+
+    // Install the level-5 interrupt handler
+    VEC_LEVEL5 = rt68ice_timer_int;
+
+    // Stop the timer and clear any pending interrupt
+    TIMER_CONTROL = 0;
+    (void)TIMER_STATUS; // Read to clear pending IRQ
+
+    // Configure divider and reload values (200Hz tick at 25 MHz)
+    TIMER_DIVIDER_HI = 0;
+    TIMER_DIVIDER_LO = 124;
+    TIMER_RELOAD_HI  = 0;
+    TIMER_RELOAD_LO  = 1000;
+
+    // Enable the timer with auto-reload and IRQ enabled
+    TIMER_CONTROL = TIMER_ENABLE | TIMER_AUTO_RELOAD | TIMER_IRQ_ENABLE;
 }
 
 #endif /* MACHINE_RT68ICE */
