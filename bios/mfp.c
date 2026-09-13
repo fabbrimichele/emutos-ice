@@ -205,7 +205,7 @@ void init_system_timer(void)
 #elif defined(MACHINE_LISA)
     lisa_init_system_timer();
 #elif defined(MACHINE_RT68ICE)    
-    rt68f_init_system_timer();    
+    rt68ice_init_system_timer();    
 #elif CONF_WITH_MFP
     /* Timer C: ctrl = divide 64, data = 192 */
     xbtimer(2, 0x50, 192, (LONG)int_timerc);

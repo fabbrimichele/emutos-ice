@@ -1068,7 +1068,7 @@ void init_serport(void)
     amiga_rs232_init();
 #endif
 
-#ifdef MACHINE_RT68F
+#ifdef MACHINE_rt68ice
     rt68ice_rs232_init();
 #endif
 

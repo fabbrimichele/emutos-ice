@@ -4,8 +4,8 @@
 /* Interrupt 5: 200 Hz timer                                                  */
 /******************************************************************************/
 // Interrupt handler
-        .globl  _rt68f_timer_int
-_rt68f_timer_int:
+        .globl  _rt68ice_timer_int
+_rt68ice_timer_int:
         // TODO: use TIMER_STATUS
         tst.w   0x00f1c002              // Clear FPGA timer IRQ (if a read/test clears it without clobbering registers)
         move.l  _vector_5ms,-(sp)   

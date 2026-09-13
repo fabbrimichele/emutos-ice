@@ -129,13 +129,13 @@ void kprintf_outc_rt68ice_rs232(int c)
 /******************************************************************************/
 /* Timer                                                                      */
 /******************************************************************************/
-void rt68f_init_system_timer(void)
+void rt68ice_init_system_timer(void)
 {
     // Debug
     LEDS = 0x4;
 
     // Install the level-5 interrupt handler
-    VEC_LEVEL5 = rt68f_timer_int;
+    VEC_LEVEL5 = rt68ice_timer_int;
 
     // Stop the timer and clear any pending interrupt
     TIMER_CONTROL = 0;
