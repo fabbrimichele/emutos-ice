@@ -1,6 +1,17 @@
 //#ifdef MACHINE_RT68ICE
 
 /******************************************************************************/
+/* Interrupt 6: Keyboard & Mouse                                              */
+/******************************************************************************/
+        .globl  _rt68f_usb_int
+_rt68f_usb_int:
+        movem.l d0-d1/a0-a1,-(sp)       // C code does not preserve these registers
+        // HW interrupt cleared in C after identifying the triggering device (mouse, keyboard or gamepad)
+        jbsr    _rt68f_usb_int_c        // Delegate to C implementation
+        movem.l (sp)+,d0-d1/a0-a1
+        rte
+
+/******************************************************************************/
 /* Interrupt 5: 200 Hz timer                                                  */
 /******************************************************************************/
 // Interrupt handler

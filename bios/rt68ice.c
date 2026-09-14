@@ -64,6 +64,59 @@
 #define MODE_640X240_4BP   0x01  // 640x240 4 bitplanes
 #define MODE_640X480_2BP   0x02  // 640x480 2 bitplanes
 
+/* USB */
+// Global interrupt registers
+#define USB_IRQ_STATUS  *(volatile UWORD*)(0x00f18000)   // Read-only pending bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Does not acknowledge a host.
+#define USB_IRQ_ENABLE  *(volatile UWORD*)(0x00f18002)   // Read/write mask bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Reset value $0000 disables USB CPU interrupts.
+
+// USB Host 1 (word offsets 8-23; registers 18-23 reserved)
+#define USB1_STATUS     *(volatile UWORD*)(0x00f18010)   // Read acknowledges Host 1. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB1_MOUSE_BTN  *(volatile UWORD*)(0x00f18012)   // Bits 2-0: middle, right, left buttons.
+#define USB1_MOUSE_DX   *(volatile UWORD*)(0x00f18014)   // Signed 16-bit X accumulator.
+#define USB1_MOUSE_DY   *(volatile UWORD*)(0x00f18016)   // Signed 16-bit Y accumulator.
+#define USB1_GAMEPAD    *(volatile UWORD*)(0x00f18018)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB1_KEY_MODS   *(volatile UWORD*)(0x00f1801a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB1_KEY1       *(volatile UWORD*)(0x00f1801c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB1_KEY2       *(volatile UWORD*)(0x00f1801e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB1_KEY3       *(volatile UWORD*)(0x00f18020)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB1_KEY4       *(volatile UWORD*)(0x00f18022)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+// USB Host 2 (word offsets 24-39; registers 34-39 reserved)
+#define USB2_STATUS     *(volatile UWORD*)(0x00f18030)   // Read acknowledges Host 2. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB2_MOUSE_BTN  *(volatile UWORD*)(0x00f18032)   // Bits 2-0: middle, right, left buttons.
+#define USB2_MOUSE_DX   *(volatile UWORD*)(0x00f18034)   // Signed 16-bit X accumulator.
+#define USB2_MOUSE_DY   *(volatile UWORD*)(0x00f18036)   // Signed 16-bit Y accumulator.
+#define USB2_GAMEPAD    *(volatile UWORD*)(0x00f18038)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB2_KEY_MODS   *(volatile UWORD*)(0x00f1803a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB2_KEY1       *(volatile UWORD*)(0x00f1803c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB2_KEY2       *(volatile UWORD*)(0x00f1803e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB2_KEY3       *(volatile UWORD*)(0x00f18040)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB2_KEY4       *(volatile UWORD*)(0x00f18042)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+// USB Host 3 (word offsets 40-55; registers 50-55 reserved) 
+#define USB3_STATUS     *(volatile UWORD*)(0x00f18050)   // Read acknowledges Host 3. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB3_MOUSE_BTN  *(volatile UWORD*)(0x00f18052)   // Bits 2-0: middle, right, left buttons.
+#define USB3_MOUSE_DX   *(volatile UWORD*)(0x00f18054)   // Signed 16-bit X accumulator.
+#define USB3_MOUSE_DY   *(volatile UWORD*)(0x00f18056)   // Signed 16-bit Y accumulator.
+#define USB3_GAMEPAD    *(volatile UWORD*)(0x00f18058)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB3_KEY_MODS   *(volatile UWORD*)(0x00f1805a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB3_KEY1       *(volatile UWORD*)(0x00f1805c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB3_KEY2       *(volatile UWORD*)(0x00f1805e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB3_KEY3       *(volatile UWORD*)(0x00f18060)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB3_KEY4       *(volatile UWORD*)(0x00f18062)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+// USB Host 4 (word offsets 56-71; registers 66-71 reserved)
+#define USB4_STATUS     *(volatile UWORD*)(0x00f18070)   // Read acknowledges Host 4. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB4_MOUSE_BTN  *(volatile UWORD*)(0x00f18072)   // Bits 2-0: middle, right, left buttons.
+#define USB4_MOUSE_DX   *(volatile UWORD*)(0x00f18074)   // Signed 16-bit X accumulator.
+#define USB4_MOUSE_DY   *(volatile UWORD*)(0x00f18076)   // Signed 16-bit Y accumulator.
+#define USB4_GAMEPAD    *(volatile UWORD*)(0x00f18078)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB4_KEY_MODS   *(volatile UWORD*)(0x00f1807a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB4_KEY1       *(volatile UWORD*)(0x00f1807c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB4_KEY2       *(volatile UWORD*)(0x00f1807e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB4_KEY3       *(volatile UWORD*)(0x00f18080)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB4_KEY4       *(volatile UWORD*)(0x00f18082)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
 
 /* Initialize Native Features */
 extern void rt68ice_init(void) 
@@ -214,7 +267,6 @@ void rt68ice_rs232_int_c(void)
 
     // Read and push serial input byte
     UBYTE c = UART_RBR;
-    LEDS = c;
     push_serial_iorec(c);
 }
 
@@ -262,5 +314,43 @@ void rt68ice_init_system_timer(void)
     // Enable the timer with auto-reload and IRQ enabled
     TIMER_CONTROL = TIMER_ENABLE | TIMER_AUTO_RELOAD | TIMER_IRQ_ENABLE;
 }
+
+/******************************************************************************/
+/* IKBD                                                                       */
+/* Documentation: https://www.kernel.org/doc/Documentation/input/atarikbd.txt */
+/******************************************************************************/
+//static UBYTE usb_mouse_buf[3];
+static UBYTE usb_mouse_buf_index;
+static BOOL  usb_keyb_is_break;
+//static BOOL  usb_keyb_is_ext;
+
+void rt68f_usb_init(void)
+{
+    // Reset mouse buffer index
+    usb_mouse_buf_index = 0;
+
+    // Reset key 
+    usb_keyb_is_break = FALSE;
+
+    // Set interrupt handlers
+    VEC_LEVEL6 = rt68f_usb_int;
+
+    // Enable Host 1 and Host 2 USB interrupts
+    USB_IRQ_ENABLE = 0x0003;
+}
+
+void rt68f_usb_int_c(void)
+{
+    // Clear interrupt
+    // TODO: it has to determine what trigger the interrupt
+    //       from USB_IRQ_STATUS and clear only the processed interrupts
+    UWORD status1 = USB1_STATUS;
+    UWORD status2 = USB2_STATUS;
+    UWORD status3 = USB3_STATUS;
+    UWORD status4 = USB4_STATUS;
+
+    LEDS = 0xF;
+}
+
 
 #endif /* MACHINE_RT68ICE */

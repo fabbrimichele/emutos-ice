@@ -38,6 +38,7 @@
 #include "bios.h"
 #include "coldfire.h"
 #include "amiga.h"
+#include "rt68ice.h"
 #include "lisa.h"
 
 
@@ -1078,6 +1079,10 @@ void kbd_init(void)
 
 #ifdef MACHINE_AMIGA
     amiga_kbd_init();
+#endif
+
+#ifdef MACHINE_RT68ICE
+    rt68f_usb_init();
 #endif
 
 #ifdef MACHINE_LISA

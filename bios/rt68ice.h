@@ -31,5 +31,10 @@ void rt68ice_timer_int(void);
 void rt68ice_timer_int_c(void);
 void rt68ice_call_5ms(void);
 
+// USB
+void rt68f_usb_init(void);
+void rt68f_usb_int(void);
+void rt68f_usb_int_c(void);
+
 #endif /* MACHINE_RT68ICE */
 #endif /* RT68ICE_H */
