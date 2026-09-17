@@ -1227,7 +1227,7 @@ static WORD desk_get_videomode(void)
 #ifdef MACHINE_AMIGA
     mode = amiga_vgetmode();
 #elif defined(MACHINE_RT68ICE)    
-    mode = rt68f_vgetmode();
+    mode = rt68ice_vgetmode();
 #else
 
 #if CONF_WITH_VIDEL

@@ -233,14 +233,14 @@ WORD mode, monitor;
 
 #ifdef MACHINE_RT68ICE
 /*
- *  change_st_rez(): change desktop RT68F resolution
+ *  change_st_rez(): change desktop rt68ice resolution
  *  returns:    0   user cancelled change
  *              1   user wants to change; newres is updated with new resolution.
  */
-static int change_rt68f_rez(WORD *newres)
+static int change_rt68ice_rez(WORD *newres)
 {
      // Switch beetween 640x480 and 640x400
-    *newres = rt68f_vgetmode() ? 0 : 1;
+    *newres = rt68ice_vgetmode() ? 0 : 1;
     return 1;    
 }
 #endif
@@ -335,7 +335,7 @@ int change_resolution(WORD *newres,WORD *newmode)
 #endif
 
 #ifdef MACHINE_RT68ICE
-    return change_rt68f_rez(newres);
+    return change_rt68ice_rez(newres);
 #endif
 
 #if CONF_WITH_VIDEL

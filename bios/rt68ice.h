@@ -6,16 +6,16 @@
 extern void rt68ice_init(void);
 
 // Screen
-void rt68f_screen_init(void);
-ULONG rt68f_vram_size(void);
-WORD rt68f_get_palette(void);
-void rt68f_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez);
-void rt68f_setrez(WORD rez, WORD videlmode);
-WORD rt68f_check_moderez(WORD moderez);
-void rt68f_set_screen_mode(UBYTE screen_mode);
-void rt68f_setphys(const UBYTE *addr);
-const UBYTE *rt68f_physbase(void);
-void rt68f_vbl_int(void);
+void rt68ice_screen_init(void);
+ULONG rt68ice_vram_size(void);
+WORD rt68ice_get_palette(void);
+void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez);
+void rt68ice_setrez(WORD rez, WORD videlmode);
+WORD rt68ice_check_moderez(WORD moderez);
+void rt68ice_set_screen_mode(UBYTE screen_mode);
+void rt68ice_setphys(const UBYTE *addr);
+const UBYTE *rt68ice_physbase(void);
+void rt68ice_vbl_int(void);
 
 // Serial
 void rt68ice_rs232_init(void);
@@ -32,10 +32,10 @@ void rt68ice_timer_int_c(void);
 void rt68ice_call_5ms(void);
 
 // USB
-void rt68f_usb_init(void);
-void rt68f_usb_int(void);
-void rt68f_usb_int_c(void);
-static void rt68f_usb_send_packet(SBYTE, SBYTE, BOOL, BOOL);
+void rt68ice_usb_init(void);
+void rt68ice_usb_int(void);
+void rt68ice_usb_int_c(void);
+static void rt68ice_usb_send_packet(SBYTE, SBYTE, BOOL, BOOL);
 
 #endif /* MACHINE_RT68ICE */
 #endif /* RT68ICE_H */

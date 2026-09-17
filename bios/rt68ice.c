@@ -133,12 +133,12 @@ extern void rt68ice_init(void)
 /******************************************************************************/
 static UBYTE current_screen_mode;
 ULONG* pword_vga_palette = (ULONG *)VIDEO_PLTE;
-const UBYTE *rt68f_screenbase;
+const UBYTE *rt68ice_screenbase;
 
 /* 
  * Initialize graphic palette and video mode 
  */
-void rt68f_screen_init(void)
+void rt68ice_screen_init(void)
 {
     // Set palette colors:
     pword_vga_palette[0] = 0x00FFFFFF; // color 0 xxRRGGBB (white)
@@ -147,17 +147,17 @@ void rt68f_screen_init(void)
     pword_vga_palette[3] = 0x00000000; // color 3 xxRRGGBB (black)
 
     /* Set VBL interrupt routine */
-    VEC_LEVEL4 = rt68f_vbl_int;
+    VEC_LEVEL4 = rt68ice_vbl_int;
 
     VIDEO_IRQ_ENABLE = 0;               // Disable VGA interrupts during setup
     (void)VIDEO_IRQ_STATUS;             // Read to clear pending IRQ
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
 
     /* Set screen mode and enable vblank interrupt */
-    rt68f_set_screen_mode(MODE_640X480_2BP);
+    rt68ice_set_screen_mode(MODE_640X480_2BP);
 }
 
-ULONG rt68f_vram_size(void)
+ULONG rt68ice_vram_size(void)
 {
     return 70800UL;
 }
@@ -165,17 +165,17 @@ ULONG rt68f_vram_size(void)
 /*
  * returns the palette (number of colour choices) for the current hardware
  */
-WORD rt68f_get_palette(void)
+WORD rt68ice_get_palette(void)
 {
     return 2;
 }
 
-WORD  rt68f_vgetmode(void)
+WORD  rt68ice_vgetmode(void)
 {
     return current_screen_mode;
 }
 
-void rt68f_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
+void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
 {
     switch (current_screen_mode)
     {
@@ -202,24 +202,24 @@ void rt68f_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
     }    
 }
 
-void rt68f_setphys(const UBYTE *addr)
+void rt68ice_setphys(const UBYTE *addr)
 {
-    rt68f_screenbase = addr;
+    rt68ice_screenbase = addr;
 }
 
-const UBYTE *rt68f_physbase(void)
+const UBYTE *rt68ice_physbase(void)
 {
-    return rt68f_screenbase;
+    return rt68ice_screenbase;
 }
 
-void rt68f_set_screen_mode(UBYTE screen_mode) 
+void rt68ice_set_screen_mode(UBYTE screen_mode) 
 {
     VIDEO_CTRL = screen_mode;
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
     current_screen_mode = screen_mode;
 }
 
-WORD rt68f_check_moderez(WORD moderez)
+WORD rt68ice_check_moderez(WORD moderez)
 {
     return (moderez == current_screen_mode)?0:moderez;
 }
@@ -230,20 +230,20 @@ WORD rt68f_check_moderez(WORD moderez)
     640x400 and 640x480, this may confuse  some applications. 
     A better approach could be the amiga one with VIDEL.
 */
-void rt68f_setrez(WORD rez, WORD videlmode)
+void rt68ice_setrez(WORD rez, WORD videlmode)
 {
     switch (rez)
     {
         case 0:
-            rt68f_set_screen_mode(MODE_320X240_8BP);
+            rt68ice_set_screen_mode(MODE_320X240_8BP);
             break;
 
         case 2:
-            rt68f_set_screen_mode(MODE_640X240_4BP);
+            rt68ice_set_screen_mode(MODE_640X240_4BP);
             break;
 
         case 1:
-            rt68f_set_screen_mode(MODE_640X480_2BP);
+            rt68ice_set_screen_mode(MODE_640X480_2BP);
             break;
 
         default:
@@ -321,12 +321,11 @@ void rt68ice_init_system_timer(void)
 /* IKBD                                                                       */
 /* Documentation: https://www.kernel.org/doc/Documentation/input/atarikbd.txt */
 /******************************************************************************/
-//static UBYTE usb_mouse_buf[3];
 static UBYTE usb_mouse_buf_index;
 static BOOL  usb_keyb_is_break;
 //static BOOL  usb_keyb_is_ext;
 
-void rt68f_usb_init(void)
+void rt68ice_usb_init(void)
 {
     
     usb_mouse_buf_index = 0;        /* Reset mouse buffer index */
@@ -340,13 +339,13 @@ void rt68f_usb_init(void)
     jsr (a1) (bios/aciavecs.S:540), jumping into address 0. */
     kbdvecs.mousevec = just_rts;
     
-    VEC_LEVEL6 = rt68f_usb_int;     /* Set interrupt handlers */
+    VEC_LEVEL6 = rt68ice_usb_int;     /* Set interrupt handlers */
     USB_IRQ_ENABLE = 0x0002;        /* Enable Host 2 USB interrupts */
 }
 
 // Requires mouse to be on USB port 2
 // TODO: I could make it more generic and allow mouse on any port
-void rt68f_usb_int_c(void)
+void rt68ice_usb_int_c(void)
 {
     UWORD irq_status = USB_IRQ_STATUS;
 
@@ -381,10 +380,10 @@ void rt68f_usb_int_c(void)
     SBYTE dx = (SBYTE) USB2_MOUSE_DX;
     SBYTE dy = (SBYTE) USB2_MOUSE_DY; 
 
-    rt68f_usb_send_packet(dx, dy, btn_left, btn_right);
+    rt68ice_usb_send_packet(dx, dy, btn_left, btn_right);
 }
 
-static void rt68f_usb_send_packet(SBYTE dx, SBYTE dy, BOOL btn_left, BOOL btn_right)
+static void rt68ice_usb_send_packet(SBYTE dx, SBYTE dy, BOOL btn_left, BOOL btn_right)
 {
     SBYTE packet[3];
     packet[0] = 0xf8; /* IKBD mouse packet header */

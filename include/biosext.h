@@ -108,7 +108,7 @@ WORD amiga_vgetmode(void);
 #endif
 
 #ifdef MACHINE_RT68ICE
-WORD rt68f_vgetmode(void);
+WORD rt68ice_vgetmode(void);
 #endif
 
 #endif /* BIOSEXT_H */

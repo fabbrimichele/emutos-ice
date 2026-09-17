@@ -1082,7 +1082,7 @@ void kbd_init(void)
 #endif
 
 #ifdef MACHINE_RT68ICE
-    rt68f_usb_init();
+    rt68ice_usb_init();
 #endif
 
 #ifdef MACHINE_LISA

@@ -3,11 +3,11 @@
 /******************************************************************************/
 /* Interrupt 6: USB (Keyboard, mouse and gamepads                             */
 /******************************************************************************/
-        .globl  _rt68f_usb_int
-_rt68f_usb_int:
+        .globl  _rt68ice_usb_int
+_rt68ice_usb_int:
         movem.l d0-d1/a0-a1,-(sp)       // C code does not preserve these registers
         // HW interrupt cleared in C after identifying the triggering device (mouse, keyboard or gamepad)
-        jbsr    _rt68f_usb_int_c        // Delegate to C implementation
+        jbsr    _rt68ice_usb_int_c        // Delegate to C implementation
         movem.l (sp)+,d0-d1/a0-a1
         rte
 
@@ -25,8 +25,8 @@ _rt68ice_timer_int:
 /******************************************************************************/
 /* Interrupt 4: VBL                                                           */
 /******************************************************************************/
-        .globl  _rt68f_vbl_int
-_rt68f_vbl_int:
+        .globl  _rt68ice_vbl_int
+_rt68ice_vbl_int:
         movem.l d0-d1/a0-a1,-(sp)       // C code does not preserve these registers
         // TODO: use VIDEO_IRQ_STATUS
         tst.w   0x00f0c002              // Read status to acknowledge the VBL
