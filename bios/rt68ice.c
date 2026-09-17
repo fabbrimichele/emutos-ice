@@ -22,6 +22,9 @@
 
 #ifdef MACHINE_RT68ICE
 
+static void rt68ice_usb_mouse_int(void);
+static void rt68ice_usb_key_int(void);
+
 /* Custom registers */
 #define LED      *(volatile UBYTE*)(0x00f00000) // LED-mapped register base address
 #define LEDS     *(volatile UWORD*)(0x00f14000) // LED array mapped register base address
