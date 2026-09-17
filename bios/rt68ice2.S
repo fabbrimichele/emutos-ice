@@ -1,7 +1,7 @@
 //#ifdef MACHINE_RT68ICE
 
 /******************************************************************************/
-/* Interrupt 6: Keyboard & Mouse                                              */
+/* Interrupt 6: USB (Keyboard, mouse and gamepads                             */
 /******************************************************************************/
         .globl  _rt68f_usb_int
 _rt68f_usb_int:

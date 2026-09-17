@@ -17,6 +17,8 @@
 #include "ikbd.h"
 #include "serport.h"
 #include "biosext.h" // For rt68ice_vgetmode
+#include "asm.h"
+#include "bios.h"   /* kbdvecs */
 
 #ifdef MACHINE_RT68ICE
 
@@ -122,7 +124,7 @@
 extern void rt68ice_init(void) 
 {
     // Debug
-    LEDS = 0x1;
+    //LEDS = 0x1;
 }
 
 
@@ -326,31 +328,79 @@ static BOOL  usb_keyb_is_break;
 
 void rt68f_usb_init(void)
 {
-    // Reset mouse buffer index
-    usb_mouse_buf_index = 0;
+    
+    usb_mouse_buf_index = 0;        /* Reset mouse buffer index */
+    usb_keyb_is_break = FALSE;      /* Reset key */
 
-    // Reset key 
-    usb_keyb_is_break = FALSE;
+    USB_IRQ_ENABLE = 0;             /* important on warm reset */
+    (void)USB2_STATUS;              /* discard/ack any pending Host 2 report */
 
-    // Set interrupt handlers
-    VEC_LEVEL6 = rt68f_usb_int;
-
-    // Enable Host 1 and Host 2 USB interrupts
-    USB_IRQ_ENABLE = 0x0003;
+    /* Safe until init_acia_vecs() runs, without it mousevec is BSS and 
+    therefore zero. call_mousevec() loads that zero callback and executes 
+    jsr (a1) (bios/aciavecs.S:540), jumping into address 0. */
+    kbdvecs.mousevec = just_rts;
+    
+    VEC_LEVEL6 = rt68f_usb_int;     /* Set interrupt handlers */
+    USB_IRQ_ENABLE = 0x0002;        /* Enable Host 2 USB interrupts */
 }
 
+// Requires mouse to be on USB port 2
+// TODO: I could make it more generic and allow mouse on any port
 void rt68f_usb_int_c(void)
 {
-    // Clear interrupt
-    // TODO: it has to determine what trigger the interrupt
-    //       from USB_IRQ_STATUS and clear only the processed interrupts
-    UWORD status1 = USB1_STATUS;
-    UWORD status2 = USB2_STATUS;
-    UWORD status3 = USB3_STATUS;
-    UWORD status4 = USB4_STATUS;
+    UWORD irq_status = USB_IRQ_STATUS;
 
-    LEDS = 0xF;
+    // if it's not USB2 irq return (mouse is supposed to be on USB2)
+    if ((irq_status & 0x0002) == 0) 
+    {
+        LEDS = 0x0001;
+
+        // TODO: handle the other USB interrupts
+        (void)USB1_STATUS;
+        (void)USB3_STATUS;
+        (void)USB4_STATUS;
+        return;
+    }
+
+    LEDS = 0x0002;
+
+    // Ack USB2 interrupt
+    UWORD status = USB2_STATUS;
+
+    LEDS = 0x0003;
+
+    // Check if it is a mouse, if not return
+    if ((status & 0x0003) != 2) {
+        LEDS = 0x0004;
+        return;
+    }
+
+    UBYTE mouse_buttons = (UBYTE) USB2_MOUSE_BTN;
+    BOOL btn_left = mouse_buttons & 0x01;
+    BOOL btn_right = mouse_buttons & 0x02;
+    SBYTE dx = (SBYTE) USB2_MOUSE_DX;
+    SBYTE dy = (SBYTE) USB2_MOUSE_DY; 
+
+    rt68f_usb_send_packet(dx, dy, btn_left, btn_right);
 }
 
+static void rt68f_usb_send_packet(SBYTE dx, SBYTE dy, BOOL btn_left, BOOL btn_right)
+{
+    SBYTE packet[3];
+    packet[0] = 0xf8; /* IKBD mouse packet header */
+
+    if (btn_right)
+        packet[0] |= 0x01;
+
+    if (btn_left)
+        packet[0] |= 0x02;
+
+    packet[1] = dx;
+    packet[2] = dy;
+
+    // Send mouse packet to IKBD handler
+    call_mousevec(packet);
+
+}
 
 #endif /* MACHINE_RT68ICE */
