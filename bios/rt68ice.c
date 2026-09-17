@@ -352,8 +352,6 @@ void rt68ice_usb_int_c(void)
     // if it's not USB2 irq return (mouse is supposed to be on USB2)
     if ((irq_status & 0x0002) == 0) 
     {
-        LEDS = 0x0001;
-
         // TODO: handle the other USB interrupts
         (void)USB1_STATUS;
         (void)USB3_STATUS;
@@ -361,45 +359,39 @@ void rt68ice_usb_int_c(void)
         return;
     }
 
-    LEDS = 0x0002;
-
     // Ack USB2 interrupt
     UWORD status = USB2_STATUS;
 
-    LEDS = 0x0003;
-
-    // Check if it is a mouse, if not return
-    if ((status & 0x0003) != 2) {
-        LEDS = 0x0004;
-        return;
+    // Check if it is a mouse
+    if ((status & 0x0003) == 2) {
+        rt68ice_usb_mouse_int();
     }
 
+}
+
+static void rt68ice_usb_key_int(void) {
+
+}
+
+static void rt68ice_usb_mouse_int(void) {
     UBYTE mouse_buttons = (UBYTE) USB2_MOUSE_BTN;
-    BOOL btn_left = mouse_buttons & 0x01;
-    BOOL btn_right = mouse_buttons & 0x02;
     SBYTE dx = (SBYTE) USB2_MOUSE_DX;
     SBYTE dy = (SBYTE) USB2_MOUSE_DY; 
 
-    rt68ice_usb_send_packet(dx, dy, btn_left, btn_right);
-}
-
-static void rt68ice_usb_send_packet(SBYTE dx, SBYTE dy, BOOL btn_left, BOOL btn_right)
-{
     SBYTE packet[3];
     packet[0] = 0xf8; /* IKBD mouse packet header */
 
-    if (btn_right)
-        packet[0] |= 0x01;
+    if (mouse_buttons & 0x02)
+        packet[0] |= 0x01; /* Right button */
 
-    if (btn_left)
-        packet[0] |= 0x02;
+    if (mouse_buttons & 0x01)
+        packet[0] |= 0x02; /* Left button */
 
     packet[1] = dx;
     packet[2] = dy;
 
-    // Send mouse packet to IKBD handler
+    /* Send mouse packet to IKBD handler */
     call_mousevec(packet);
-
 }
 
 #endif /* MACHINE_RT68ICE */

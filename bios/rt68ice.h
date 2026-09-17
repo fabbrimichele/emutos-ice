@@ -36,6 +36,7 @@ void rt68ice_usb_init(void);
 void rt68ice_usb_int(void);
 void rt68ice_usb_int_c(void);
 static void rt68ice_usb_send_packet(SBYTE, SBYTE, BOOL, BOOL);
+static void rt68ice_usb_mouse_int(void);
 
 #endif /* MACHINE_RT68ICE */
 #endif /* RT68ICE_H */
