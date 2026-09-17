@@ -119,6 +119,10 @@
 #define USB4_KEY3       *(volatile UWORD*)(0x00f18080)   // Third USB HID boot-keyboard usage ID; zero means no key.
 #define USB4_KEY4       *(volatile UWORD*)(0x00f18082)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
 
+#define USB_DEV_TYPE        0x0003
+#define USB_DEV_TYPE_KEY    0x1
+#define USB_DEV_TYPE_MOUSE  0x2
+
 
 /* Initialize Native Features */
 extern void rt68ice_init(void) 
@@ -339,41 +343,48 @@ void rt68ice_usb_init(void)
     jsr (a1) (bios/aciavecs.S:540), jumping into address 0. */
     kbdvecs.mousevec = just_rts;
     
-    VEC_LEVEL6 = rt68ice_usb_int;     /* Set interrupt handlers */
-    USB_IRQ_ENABLE = 0x0002;        /* Enable Host 2 USB interrupts */
+    VEC_LEVEL6 = rt68ice_usb_int;   /* Set interrupt handlers */
+    USB_IRQ_ENABLE = 0x0003;        /* Enable USB1 and USB2 interrupts */
 }
 
-// Requires mouse to be on USB port 2
-// TODO: I could make it more generic and allow mouse on any port
+/********************************************************************/
+/* Requires                                                         */
+/* - Keyboard on USB port 1                                         */
+/* - Mouse on USB port 2                                            */
+/* TODO: I could make it more generic and allow mouse on any port   */
+/********************************************************************/
 void rt68ice_usb_int_c(void)
 {
     UWORD irq_status = USB_IRQ_STATUS;
 
-    // if it's not USB2 irq return (mouse is supposed to be on USB2)
-    if ((irq_status & 0x0002) == 0) 
+    if (irq_status & 0x0001)
+    {        
+        UWORD status = USB1_STATUS;     /* acknowledge host 1 */
+        
+        if ((status & USB_DEV_TYPE) == USB_DEV_TYPE_KEY)
+            rt68ice_usb_key_int();
+    }
+    
+    if (irq_status & 0x0002)
     {
-        // TODO: handle the other USB interrupts
-        (void)USB1_STATUS;
-        (void)USB3_STATUS;
-        (void)USB4_STATUS;
-        return;
+        UWORD status = USB2_STATUS;     /* acknowledge host 2 */
+
+        if ((status & USB_DEV_TYPE) == USB_DEV_TYPE_MOUSE)
+            rt68ice_usb_mouse_int();
     }
 
-    // Ack USB2 interrupt
-    UWORD status = USB2_STATUS;
-
-    // Check if it is a mouse
-    if ((status & 0x0003) == 2) {
-        rt68ice_usb_mouse_int();
-    }
-
+    // TODO: handle the other USB interrupts
+    (void)USB3_STATUS;
+    (void)USB4_STATUS;
 }
 
 static void rt68ice_usb_key_int(void) {
-
+    LEDS = 0x1;
 }
 
 static void rt68ice_usb_mouse_int(void) {
+    LEDS = 0x2;
+
     UBYTE mouse_buttons = (UBYTE) USB2_MOUSE_BTN;
     SBYTE dx = (SBYTE) USB2_MOUSE_DX;
     SBYTE dy = (SBYTE) USB2_MOUSE_DY; 
