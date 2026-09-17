@@ -17,6 +17,8 @@
 #include "ikbd.h"
 #include "serport.h"
 #include "biosext.h" // For rt68ice_vgetmode
+#include "asm.h"
+#include "bios.h"   /* kbdvecs */
 
 #ifdef MACHINE_RT68ICE
 
@@ -64,12 +66,65 @@
 #define MODE_640X240_4BP   0x01  // 640x240 4 bitplanes
 #define MODE_640X480_2BP   0x02  // 640x480 2 bitplanes
 
+/* USB */
+// Global interrupt registers
+#define USB_IRQ_STATUS  *(volatile UWORD*)(0x00f18000)   // Read-only pending bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Does not acknowledge a host.
+#define USB_IRQ_ENABLE  *(volatile UWORD*)(0x00f18002)   // Read/write mask bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Reset value $0000 disables USB CPU interrupts.
+
+// USB Host 1 (word offsets 8-23; registers 18-23 reserved)
+#define USB1_STATUS     *(volatile UWORD*)(0x00f18010)   // Read acknowledges Host 1. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB1_MOUSE_BTN  *(volatile UWORD*)(0x00f18012)   // Bits 2-0: middle, right, left buttons.
+#define USB1_MOUSE_DX   *(volatile UWORD*)(0x00f18014)   // Signed 16-bit X accumulator.
+#define USB1_MOUSE_DY   *(volatile UWORD*)(0x00f18016)   // Signed 16-bit Y accumulator.
+#define USB1_GAMEPAD    *(volatile UWORD*)(0x00f18018)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB1_KEY_MODS   *(volatile UWORD*)(0x00f1801a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB1_KEY1       *(volatile UWORD*)(0x00f1801c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB1_KEY2       *(volatile UWORD*)(0x00f1801e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB1_KEY3       *(volatile UWORD*)(0x00f18020)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB1_KEY4       *(volatile UWORD*)(0x00f18022)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+// USB Host 2 (word offsets 24-39; registers 34-39 reserved)
+#define USB2_STATUS     *(volatile UWORD*)(0x00f18030)   // Read acknowledges Host 2. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB2_MOUSE_BTN  *(volatile UWORD*)(0x00f18032)   // Bits 2-0: middle, right, left buttons.
+#define USB2_MOUSE_DX   *(volatile UWORD*)(0x00f18034)   // Signed 16-bit X accumulator.
+#define USB2_MOUSE_DY   *(volatile UWORD*)(0x00f18036)   // Signed 16-bit Y accumulator.
+#define USB2_GAMEPAD    *(volatile UWORD*)(0x00f18038)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB2_KEY_MODS   *(volatile UWORD*)(0x00f1803a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB2_KEY1       *(volatile UWORD*)(0x00f1803c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB2_KEY2       *(volatile UWORD*)(0x00f1803e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB2_KEY3       *(volatile UWORD*)(0x00f18040)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB2_KEY4       *(volatile UWORD*)(0x00f18042)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+// USB Host 3 (word offsets 40-55; registers 50-55 reserved) 
+#define USB3_STATUS     *(volatile UWORD*)(0x00f18050)   // Read acknowledges Host 3. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB3_MOUSE_BTN  *(volatile UWORD*)(0x00f18052)   // Bits 2-0: middle, right, left buttons.
+#define USB3_MOUSE_DX   *(volatile UWORD*)(0x00f18054)   // Signed 16-bit X accumulator.
+#define USB3_MOUSE_DY   *(volatile UWORD*)(0x00f18056)   // Signed 16-bit Y accumulator.
+#define USB3_GAMEPAD    *(volatile UWORD*)(0x00f18058)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB3_KEY_MODS   *(volatile UWORD*)(0x00f1805a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB3_KEY1       *(volatile UWORD*)(0x00f1805c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB3_KEY2       *(volatile UWORD*)(0x00f1805e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB3_KEY3       *(volatile UWORD*)(0x00f18060)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB3_KEY4       *(volatile UWORD*)(0x00f18062)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+// USB Host 4 (word offsets 56-71; registers 66-71 reserved)
+#define USB4_STATUS     *(volatile UWORD*)(0x00f18070)   // Read acknowledges Host 4. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+#define USB4_MOUSE_BTN  *(volatile UWORD*)(0x00f18072)   // Bits 2-0: middle, right, left buttons.
+#define USB4_MOUSE_DX   *(volatile UWORD*)(0x00f18074)   // Signed 16-bit X accumulator.
+#define USB4_MOUSE_DY   *(volatile UWORD*)(0x00f18076)   // Signed 16-bit Y accumulator.
+#define USB4_GAMEPAD    *(volatile UWORD*)(0x00f18078)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB4_KEY_MODS   *(volatile UWORD*)(0x00f1807a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+#define USB4_KEY1       *(volatile UWORD*)(0x00f1807c)   // First USB HID boot-keyboard usage ID; zero means no key.
+#define USB4_KEY2       *(volatile UWORD*)(0x00f1807e)   // Second USB HID boot-keyboard usage ID; zero means no key.
+#define USB4_KEY3       *(volatile UWORD*)(0x00f18080)   // Third USB HID boot-keyboard usage ID; zero means no key.
+#define USB4_KEY4       *(volatile UWORD*)(0x00f18082)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
 
 /* Initialize Native Features */
 extern void rt68ice_init(void) 
 {
     // Debug
-    LEDS = 0x1;
+    //LEDS = 0x1;
 }
 
 
@@ -78,12 +133,12 @@ extern void rt68ice_init(void)
 /******************************************************************************/
 static UBYTE current_screen_mode;
 ULONG* pword_vga_palette = (ULONG *)VIDEO_PLTE;
-const UBYTE *rt68f_screenbase;
+const UBYTE *rt68ice_screenbase;
 
 /* 
  * Initialize graphic palette and video mode 
  */
-void rt68f_screen_init(void)
+void rt68ice_screen_init(void)
 {
     // Set palette colors:
     pword_vga_palette[0] = 0x00FFFFFF; // color 0 xxRRGGBB (white)
@@ -92,17 +147,17 @@ void rt68f_screen_init(void)
     pword_vga_palette[3] = 0x00000000; // color 3 xxRRGGBB (black)
 
     /* Set VBL interrupt routine */
-    VEC_LEVEL4 = rt68f_vbl_int;
+    VEC_LEVEL4 = rt68ice_vbl_int;
 
     VIDEO_IRQ_ENABLE = 0;               // Disable VGA interrupts during setup
     (void)VIDEO_IRQ_STATUS;             // Read to clear pending IRQ
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
 
     /* Set screen mode and enable vblank interrupt */
-    rt68f_set_screen_mode(MODE_640X480_2BP);
+    rt68ice_set_screen_mode(MODE_640X480_2BP);
 }
 
-ULONG rt68f_vram_size(void)
+ULONG rt68ice_vram_size(void)
 {
     return 70800UL;
 }
@@ -110,17 +165,17 @@ ULONG rt68f_vram_size(void)
 /*
  * returns the palette (number of colour choices) for the current hardware
  */
-WORD rt68f_get_palette(void)
+WORD rt68ice_get_palette(void)
 {
     return 2;
 }
 
-WORD  rt68f_vgetmode(void)
+WORD  rt68ice_vgetmode(void)
 {
     return current_screen_mode;
 }
 
-void rt68f_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
+void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
 {
     switch (current_screen_mode)
     {
@@ -147,24 +202,24 @@ void rt68f_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
     }    
 }
 
-void rt68f_setphys(const UBYTE *addr)
+void rt68ice_setphys(const UBYTE *addr)
 {
-    rt68f_screenbase = addr;
+    rt68ice_screenbase = addr;
 }
 
-const UBYTE *rt68f_physbase(void)
+const UBYTE *rt68ice_physbase(void)
 {
-    return rt68f_screenbase;
+    return rt68ice_screenbase;
 }
 
-void rt68f_set_screen_mode(UBYTE screen_mode) 
+void rt68ice_set_screen_mode(UBYTE screen_mode) 
 {
     VIDEO_CTRL = screen_mode;
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
     current_screen_mode = screen_mode;
 }
 
-WORD rt68f_check_moderez(WORD moderez)
+WORD rt68ice_check_moderez(WORD moderez)
 {
     return (moderez == current_screen_mode)?0:moderez;
 }
@@ -175,20 +230,20 @@ WORD rt68f_check_moderez(WORD moderez)
     640x400 and 640x480, this may confuse  some applications. 
     A better approach could be the amiga one with VIDEL.
 */
-void rt68f_setrez(WORD rez, WORD videlmode)
+void rt68ice_setrez(WORD rez, WORD videlmode)
 {
     switch (rez)
     {
         case 0:
-            rt68f_set_screen_mode(MODE_320X240_8BP);
+            rt68ice_set_screen_mode(MODE_320X240_8BP);
             break;
 
         case 2:
-            rt68f_set_screen_mode(MODE_640X240_4BP);
+            rt68ice_set_screen_mode(MODE_640X240_4BP);
             break;
 
         case 1:
-            rt68f_set_screen_mode(MODE_640X480_2BP);
+            rt68ice_set_screen_mode(MODE_640X480_2BP);
             break;
 
         default:
@@ -214,7 +269,6 @@ void rt68ice_rs232_int_c(void)
 
     // Read and push serial input byte
     UBYTE c = UART_RBR;
-    LEDS = c;
     push_serial_iorec(c);
 }
 
@@ -261,6 +315,91 @@ void rt68ice_init_system_timer(void)
 
     // Enable the timer with auto-reload and IRQ enabled
     TIMER_CONTROL = TIMER_ENABLE | TIMER_AUTO_RELOAD | TIMER_IRQ_ENABLE;
+}
+
+/******************************************************************************/
+/* IKBD                                                                       */
+/* Documentation: https://www.kernel.org/doc/Documentation/input/atarikbd.txt */
+/******************************************************************************/
+static UBYTE usb_mouse_buf_index;
+static BOOL  usb_keyb_is_break;
+//static BOOL  usb_keyb_is_ext;
+
+void rt68ice_usb_init(void)
+{
+    
+    usb_mouse_buf_index = 0;        /* Reset mouse buffer index */
+    usb_keyb_is_break = FALSE;      /* Reset key */
+
+    USB_IRQ_ENABLE = 0;             /* important on warm reset */
+    (void)USB2_STATUS;              /* discard/ack any pending Host 2 report */
+
+    /* Safe until init_acia_vecs() runs, without it mousevec is BSS and 
+    therefore zero. call_mousevec() loads that zero callback and executes 
+    jsr (a1) (bios/aciavecs.S:540), jumping into address 0. */
+    kbdvecs.mousevec = just_rts;
+    
+    VEC_LEVEL6 = rt68ice_usb_int;     /* Set interrupt handlers */
+    USB_IRQ_ENABLE = 0x0002;        /* Enable Host 2 USB interrupts */
+}
+
+// Requires mouse to be on USB port 2
+// TODO: I could make it more generic and allow mouse on any port
+void rt68ice_usb_int_c(void)
+{
+    UWORD irq_status = USB_IRQ_STATUS;
+
+    // if it's not USB2 irq return (mouse is supposed to be on USB2)
+    if ((irq_status & 0x0002) == 0) 
+    {
+        LEDS = 0x0001;
+
+        // TODO: handle the other USB interrupts
+        (void)USB1_STATUS;
+        (void)USB3_STATUS;
+        (void)USB4_STATUS;
+        return;
+    }
+
+    LEDS = 0x0002;
+
+    // Ack USB2 interrupt
+    UWORD status = USB2_STATUS;
+
+    LEDS = 0x0003;
+
+    // Check if it is a mouse, if not return
+    if ((status & 0x0003) != 2) {
+        LEDS = 0x0004;
+        return;
+    }
+
+    UBYTE mouse_buttons = (UBYTE) USB2_MOUSE_BTN;
+    BOOL btn_left = mouse_buttons & 0x01;
+    BOOL btn_right = mouse_buttons & 0x02;
+    SBYTE dx = (SBYTE) USB2_MOUSE_DX;
+    SBYTE dy = (SBYTE) USB2_MOUSE_DY; 
+
+    rt68ice_usb_send_packet(dx, dy, btn_left, btn_right);
+}
+
+static void rt68ice_usb_send_packet(SBYTE dx, SBYTE dy, BOOL btn_left, BOOL btn_right)
+{
+    SBYTE packet[3];
+    packet[0] = 0xf8; /* IKBD mouse packet header */
+
+    if (btn_right)
+        packet[0] |= 0x01;
+
+    if (btn_left)
+        packet[0] |= 0x02;
+
+    packet[1] = dx;
+    packet[2] = dy;
+
+    // Send mouse packet to IKBD handler
+    call_mousevec(packet);
+
 }
 
 #endif /* MACHINE_RT68ICE */
