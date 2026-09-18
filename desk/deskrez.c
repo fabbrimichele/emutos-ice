@@ -247,7 +247,6 @@ static int change_rt68ice_rez(WORD *newres)
 }
 #endif
 
-
 #ifdef MACHINE_AMIGA
 /* This assumes that inside ADAMIREZ dialog, buttons are sorted
  * left to right then top to bottom. */
