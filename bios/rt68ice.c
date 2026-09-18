@@ -434,6 +434,9 @@ static const UBYTE usb_to_idkb_map[256] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // F0
 };
 
+#define IDKB_BREAK              0x80
+#define IDKB_CAPSLOCK           0x3a
+
 //static UBYTE last_key_mods = 0;
 static UBYTE last_key1 = 0;
 /*
@@ -451,12 +454,15 @@ static void rt68ice_usb_key_int(void) {
     */
 
     if (curr_key1 != last_key1) {
-        // TODO: handle key release (without, sometimes keys are repeated when they shouldn't)
-        last_key1 = curr_key1;
-        UBYTE idkb_code = usb_to_idkb_map[curr_key1];
-        call_ikbdraw(idkb_code);
+        UBYTE idkb_code;
+        if (curr_key1 != 0) 
+            idkb_code = usb_to_idkb_map[curr_key1];              /* key pressed */
+        else                
+            idkb_code = usb_to_idkb_map[last_key1] | IDKB_BREAK; /* key released */
 
-        LEDS = (UWORD) idkb_code;
+        call_ikbdraw(idkb_code);
+        LEDS = (UWORD) idkb_code; /* Debug */
+        last_key1 = curr_key1;
     }
 
     // TODO: handle the other keys and modifiers
