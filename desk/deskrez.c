@@ -239,8 +239,10 @@ WORD mode, monitor;
  */
 static int change_rt68ice_rez(WORD *newres)
 {
-     // Switch beetween 640x480 and 640x400
-    *newres = rt68ice_vgetmode() ? 0 : 1;
+     /* Switch beetween 640x240 and 640x480 */
+
+    *newres = rt68ice_vgetmode() == 2 ? 1 : 2;
+
     return 1;    
 }
 #endif
