@@ -696,6 +696,10 @@ int rez_changeable(void)
     return TRUE;
 #endif
 
+#ifdef MACHINE_RT68ICE
+    return TRUE;
+#endif
+
 #if CONF_WITH_VIDEL
     if (has_videl)  /* can't change if real ST monochrome monitor */
         return (VgetMonitor() != MON_MONO);
@@ -909,7 +913,7 @@ static __inline__ void get_std_pixel_size(WORD *width,WORD *height)
  */
 void get_pixel_size(WORD *width,WORD *height)
 {
-#ifdef MACHINE_AMIGA
+#ifdef MACHINE_AMIGA || defined(MACHINE_RT68ICE)
     get_std_pixel_size(width,height);
 #else
     if (HAS_VIDEL || HAS_TT_SHIFTER)

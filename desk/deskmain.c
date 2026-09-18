@@ -912,6 +912,9 @@ static WORD do_optnmenu(WORD item)
 #if CONF_WITH_ATARI_VIDEO
             else shel_write(SHW_RESCHNG,newres+2,0,NULL,NULL);
 #endif
+#if defined(MACHINE_RT68ICE)
+            else shel_write(SHW_RESCHNG,newres+2,0,NULL,NULL);            
+#endif
             done = TRUE;
         }
         break;
