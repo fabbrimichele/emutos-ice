@@ -148,11 +148,23 @@ const UBYTE *rt68ice_screenbase;
  */
 void rt68ice_screen_init(void)
 {
-    // Set palette colors:
-    pword_vga_palette[0] = 0x00FFFFFF; // color 0 xxRRGGBB (white)
-    pword_vga_palette[1] = 0x00FF0000; // color 1 xxRRGGBB (red)
-    pword_vga_palette[2] = 0x0000FF00; // color 2 xxRRGGBB (green)
-    pword_vga_palette[3] = 0x00000000; // color 3 xxRRGGBB (black)
+    // Set palette colors (xxRRGGBB):
+    pword_vga_palette[0x0] = 0x00FFFFFF; // White
+    pword_vga_palette[0x1] = 0x00FF0000; // Red
+    pword_vga_palette[0x2] = 0x0000FF00; // Green
+    pword_vga_palette[0x3] = 0x00000000; // Black
+    pword_vga_palette[0x4] = 0x000000FF; // Blue
+    pword_vga_palette[0x5] = 0x00FFFF00; // Yellow
+    pword_vga_palette[0x6] = 0x00FF00FF; // Magenta    
+    pword_vga_palette[0x7] = 0x0000FFFF; // Cyan
+    pword_vga_palette[0x8] = 0x00808080; // Medium Gray
+    pword_vga_palette[0x9] = 0x00800000; // Dark Red
+    pword_vga_palette[0xa] = 0x00008000; // Dark Green
+    pword_vga_palette[0xb] = 0x00000080; // Dark Blue
+    pword_vga_palette[0xc] = 0x00808000; // Olive
+    pword_vga_palette[0xd] = 0x00800080; // Purple
+    pword_vga_palette[0xe] = 0x00008080; // Teal
+    pword_vga_palette[0xf] = 0x00404040; // Dark Gray
 
     /* Set VBL interrupt routine */
     VEC_LEVEL4 = rt68ice_vbl_int;
@@ -163,6 +175,7 @@ void rt68ice_screen_init(void)
 
     /* Set screen mode and enable vblank interrupt */
     rt68ice_set_screen_mode(MODE_640X480_2BP);
+    //rt68ice_set_screen_mode(MODE_640X240_4BP);
 }
 
 ULONG rt68ice_vram_size(void)
@@ -175,10 +188,10 @@ ULONG rt68ice_vram_size(void)
  */
 WORD rt68ice_get_palette(void)
 {
-    return 2;
+    return 4096;
 }
 
-WORD  rt68ice_vgetmode(void)
+WORD rt68ice_vgetmode(void)
 {
     return current_screen_mode;
 }
@@ -187,10 +200,16 @@ void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
 {
     switch (current_screen_mode)
     {
+        /* TODO: MODE_320X240_8BP resolution doesn't work 
+                 the problem might be the number of planes,
+                 I tried to set it to 4 and it wasn't stuck.
+                 (Screen wasn't shown properly because the
+                 RT68ICE low res uses 8 planes)
+        */
         case MODE_320X240_8BP:
             *hz_rez = 320;
             *vt_rez = 240;
-            *planes = 8;
+            *planes = 8; /* TODO: 8 planes doesn't work*/
             break;
 
         case MODE_640X240_4BP:
