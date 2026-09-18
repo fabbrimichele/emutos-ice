@@ -22,6 +22,10 @@
 
 #ifdef MACHINE_RT68ICE
 
+static void rt68ice_usb_mouse_int(void);
+static void rt68ice_usb_key_int(void);
+static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
+
 /* Custom registers */
 #define LED      *(volatile UBYTE*)(0x00f00000) // LED-mapped register base address
 #define LEDS     *(volatile UWORD*)(0x00f14000) // LED array mapped register base address
@@ -118,6 +122,10 @@
 #define USB4_KEY2       *(volatile UWORD*)(0x00f1807e)   // Second USB HID boot-keyboard usage ID; zero means no key.
 #define USB4_KEY3       *(volatile UWORD*)(0x00f18080)   // Third USB HID boot-keyboard usage ID; zero means no key.
 #define USB4_KEY4       *(volatile UWORD*)(0x00f18082)   // Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+#define USB_DEV_TYPE        0x0003
+#define USB_DEV_TYPE_KEY    0x1
+#define USB_DEV_TYPE_MOUSE  0x2
 
 
 /* Initialize Native Features */
@@ -323,6 +331,8 @@ void rt68ice_init_system_timer(void)
 /******************************************************************************/
 static UBYTE usb_mouse_buf_index;
 static BOOL  usb_keyb_is_break;
+static UBYTE usb_last_key_mods;
+static UBYTE usb_last_keys[4];
 //static BOOL  usb_keyb_is_ext;
 
 void rt68ice_usb_init(void)
@@ -330,6 +340,9 @@ void rt68ice_usb_init(void)
     
     usb_mouse_buf_index = 0;        /* Reset mouse buffer index */
     usb_keyb_is_break = FALSE;      /* Reset key */
+    usb_last_key_mods = 0;
+    usb_last_keys[0] = usb_last_keys[1] = 0;
+    usb_last_keys[2] = usb_last_keys[3] = 0;
 
     USB_IRQ_ENABLE = 0;             /* important on warm reset */
     (void)USB2_STATUS;              /* discard/ack any pending Host 2 report */
@@ -339,67 +352,163 @@ void rt68ice_usb_init(void)
     jsr (a1) (bios/aciavecs.S:540), jumping into address 0. */
     kbdvecs.mousevec = just_rts;
     
-    VEC_LEVEL6 = rt68ice_usb_int;     /* Set interrupt handlers */
-    USB_IRQ_ENABLE = 0x0002;        /* Enable Host 2 USB interrupts */
+    VEC_LEVEL6 = rt68ice_usb_int;   /* Set interrupt handlers */
+    USB_IRQ_ENABLE = 0x0003;        /* Enable USB1 and USB2 interrupts */
 }
 
-// Requires mouse to be on USB port 2
-// TODO: I could make it more generic and allow mouse on any port
+/********************************************************************/
+/* Requires                                                         */
+/* - Keyboard on USB port 1                                         */
+/* - Mouse on USB port 2                                            */
+/* TODO: I could make it more generic and allow mouse on any port   */
+/********************************************************************/
 void rt68ice_usb_int_c(void)
 {
     UWORD irq_status = USB_IRQ_STATUS;
 
-    // if it's not USB2 irq return (mouse is supposed to be on USB2)
-    if ((irq_status & 0x0002) == 0) 
+    if (irq_status & 0x0001)
+    {        
+        UWORD status = USB1_STATUS;     /* acknowledge host 1 */
+        
+        if ((status & USB_DEV_TYPE) == USB_DEV_TYPE_KEY)
+            rt68ice_usb_key_int();
+    }
+    
+    if (irq_status & 0x0002)
     {
-        LEDS = 0x0001;
+        UWORD status = USB2_STATUS;     /* acknowledge host 2 */
 
-        // TODO: handle the other USB interrupts
-        (void)USB1_STATUS;
-        (void)USB3_STATUS;
-        (void)USB4_STATUS;
-        return;
+        if ((status & USB_DEV_TYPE) == USB_DEV_TYPE_MOUSE)
+            rt68ice_usb_mouse_int();
     }
 
-    LEDS = 0x0002;
+    // TODO: handle the other USB interrupts
+    (void)USB3_STATUS;
+    (void)USB4_STATUS;
+}
 
-    // Ack USB2 interrupt
-    UWORD status = USB2_STATUS;
-
-    LEDS = 0x0003;
-
-    // Check if it is a mouse, if not return
-    if ((status & 0x0003) != 2) {
-        LEDS = 0x0004;
-        return;
-    }
+static void rt68ice_usb_mouse_int(void) {
+    LEDS = 0x2;
 
     UBYTE mouse_buttons = (UBYTE) USB2_MOUSE_BTN;
-    BOOL btn_left = mouse_buttons & 0x01;
-    BOOL btn_right = mouse_buttons & 0x02;
     SBYTE dx = (SBYTE) USB2_MOUSE_DX;
     SBYTE dy = (SBYTE) USB2_MOUSE_DY; 
 
-    rt68ice_usb_send_packet(dx, dy, btn_left, btn_right);
-}
-
-static void rt68ice_usb_send_packet(SBYTE dx, SBYTE dy, BOOL btn_left, BOOL btn_right)
-{
     SBYTE packet[3];
     packet[0] = 0xf8; /* IKBD mouse packet header */
 
-    if (btn_right)
-        packet[0] |= 0x01;
+    if (mouse_buttons & 0x02)
+        packet[0] |= 0x01; /* Right button */
 
-    if (btn_left)
-        packet[0] |= 0x02;
+    if (mouse_buttons & 0x01)
+        packet[0] |= 0x02; /* Left button */
 
     packet[1] = dx;
     packet[2] = dy;
 
-    // Send mouse packet to IKBD handler
+    /* Send mouse packet to IKBD handler */
     call_mousevec(packet);
-
 }
+
+/*
+ * USB HID Keyboard/Keypad usage ID to Atari IKBD make code.
+ *
+ * A zero denotes an HID usage which has no Atari equivalent.  The eight HID
+ * modifier usages (0xe0-0xe7) are deliberately not mapped here: they are
+ * reported separately by USB1_KEY_MODS.
+ *
+ * Atari IKBD scan codes:
+ * https://www.kernel.org/doc/Documentation/input/atarikbd.txt
+ */
+static const UBYTE usb_to_idkb_map[256] = {
+    // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
+    0x00, 0x00, 0x00, 0x00, 0x1e, 0x30, 0x2e, 0x20, 0x12, 0x21, 0x22, 0x23, 0x17, 0x24, 0x25, 0x26, // 00: A-L
+    0x32, 0x31, 0x18, 0x19, 0x10, 0x13, 0x1f, 0x14, 0x16, 0x2f, 0x11, 0x2d, 0x15, 0x2c, 0x02, 0x03, // 10: M-Z, 1-2
+    0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x1c, 0x01, 0x0e, 0x0f, 0x39, 0x0c, 0x0d, 0x1a, // 20: 3-0, controls, [
+    0x1b, 0x2b, 0x2b, 0x27, 0x28, 0x29, 0x33, 0x34, 0x35, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, // 30: ], punctuation, Caps, F1-F7
+    0x41, 0x42, 0x43, 0x44, 0x00, 0x00, 0x00, 0x00, 0x52, 0x47, 0x00, 0x53, 0x00, 0x00, 0x4d, 0x4b, // 40: F8-F10, navigation
+    0x50, 0x48, 0x00, 0x64, 0x65, 0x4a, 0x4e, 0x72, 0x6d, 0x6e, 0x6f, 0x6a, 0x6b, 0x6c, 0x67, 0x68, // 50: arrows, keypad / * - + Enter, 1-8
+    0x69, 0x70, 0x71, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 60: keypad 9, 0, ., ISO key
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x62, 0x00, 0x00, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00, 0x00, 0x00, // 70: Help, Undo
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 80
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 90
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // A0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // B0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // C0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // D0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // E0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // F0
+};
+
+#define IDKB_BREAK              0x80
+
+static BOOL rt68ice_usb_key_present(const UBYTE *keys, UBYTE usage)
+{
+    UBYTE i;
+
+    for (i = 0; i < 4; i++)
+        if (keys[i] == usage)
+            return TRUE;
+
+    return FALSE;
+}
+
+static void rt68ice_usb_send_key(UBYTE usage, BOOL released)
+{
+    UBYTE scancode = usb_to_idkb_map[usage];
+
+    if (scancode != 0) {
+        if (released)
+            scancode |= IDKB_BREAK;
+        call_ikbdraw(scancode);
+    }
+}
+
+static void process_usb_modifier(UBYTE current, UBYTE mask, UBYTE scancode)
+{
+    BOOL was_down = (usb_last_key_mods & mask) != 0;
+    BOOL is_down = (current & mask) != 0;
+
+    if (was_down != is_down)
+        call_ikbdraw(is_down ? scancode : (scancode | IDKB_BREAK));
+}
+
+static void rt68ice_usb_key_int(void)
+{
+    UBYTE current_mods = (UBYTE)USB1_KEY_MODS;
+    UBYTE current_keys[4];
+    UBYTE i;
+
+    current_keys[0] = (UBYTE)USB1_KEY1;
+    current_keys[1] = (UBYTE)USB1_KEY2;
+    current_keys[2] = (UBYTE)USB1_KEY3;
+    current_keys[3] = (UBYTE)USB1_KEY4;
+
+    /* HID 0x01 means ErrorRollOver; ignore the incomplete report. */
+    for (i = 0; i < 4; i++)
+        if (current_keys[i] == 0x01)
+            return;
+
+    /* Release ordinary keys which disappeared from the new report. */
+    for (i = 0; i < 4; i++)
+        if (usb_last_keys[i] != 0 && !rt68ice_usb_key_present(current_keys, usb_last_keys[i]))
+            rt68ice_usb_send_key(usb_last_keys[i], TRUE);
+
+    process_usb_modifier(current_mods, (1 << 1), 0x2a); /* left Shift */
+    process_usb_modifier(current_mods, (1 << 5), 0x36); /* right Shift */
+    process_usb_modifier(current_mods, (1 << 0) | (1 << 4), 0x1d); /* Ctrl */
+    process_usb_modifier(current_mods, (1 << 2) | (1 << 6), 0x38); /* Alt */
+
+    /* Press ordinary keys which appeared in the new report. */
+    for (i = 0; i < 4; i++)
+        if (current_keys[i] != 0 && !rt68ice_usb_key_present(usb_last_keys, current_keys[i]))
+            rt68ice_usb_send_key(current_keys[i], FALSE);
+
+    for (i = 0; i < 4; i++)
+        usb_last_keys[i] = current_keys[i];
+    
+    usb_last_key_mods = current_mods;
+}
+
 
 #endif /* MACHINE_RT68ICE */
