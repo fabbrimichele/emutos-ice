@@ -265,11 +265,11 @@ void rt68ice_setrez(WORD rez, WORD videlmode)
             rt68ice_set_screen_mode(MODE_320X240_8BP);
             break;
 
-        case 2:
+        case 1:
             rt68ice_set_screen_mode(MODE_640X240_4BP);
             break;
 
-        case 1:
+        case 2:
             rt68ice_set_screen_mode(MODE_640X480_2BP);
             break;
 
