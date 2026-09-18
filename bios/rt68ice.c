@@ -24,7 +24,7 @@
 
 static void rt68ice_usb_mouse_int(void);
 static void rt68ice_usb_key_int(void);
-static void process_usb_modifiers(UBYTE);
+static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 
 /* Custom registers */
 #define LED      *(volatile UBYTE*)(0x00f00000) // LED-mapped register base address
@@ -331,6 +331,8 @@ void rt68ice_init_system_timer(void)
 /******************************************************************************/
 static UBYTE usb_mouse_buf_index;
 static BOOL  usb_keyb_is_break;
+static UBYTE usb_last_key_mods;
+static UBYTE usb_last_keys[4];
 //static BOOL  usb_keyb_is_ext;
 
 void rt68ice_usb_init(void)
@@ -338,6 +340,9 @@ void rt68ice_usb_init(void)
     
     usb_mouse_buf_index = 0;        /* Reset mouse buffer index */
     usb_keyb_is_break = FALSE;      /* Reset key */
+    usb_last_key_mods = 0;
+    usb_last_keys[0] = usb_last_keys[1] = 0;
+    usb_last_keys[2] = usb_last_keys[3] = 0;
 
     USB_IRQ_ENABLE = 0;             /* important on warm reset */
     (void)USB2_STATUS;              /* discard/ack any pending Host 2 report */
@@ -435,72 +440,74 @@ static const UBYTE usb_to_idkb_map[256] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // F0
 };
 
-static const UBYTE modifier_scancodes[8] = {
-    0x1d, /* bit 0: left Ctrl  */
-    0x2a, /* bit 1: left Shift */
-    0x38, /* bit 2: left Alt   */
-    0x00, /* bit 3: left GUI   */
-    0x1d, /* bit 4: right Ctrl */
-    0x36, /* bit 5: right Shift*/
-    0x38, /* bit 6: right Alt  */
-    0x00  /* bit 7: right GUI  */
-};
 #define IDKB_BREAK              0x80
-#define IDKB_CAPSLOCK           0x3a
 
-static UBYTE last_key_mods = 0;
-static UBYTE last_key1 = 0;
-/*
-static UBYTE last_key2 = 0;
-static UBYTE last_key3 = 0;
-static UBYTE last_key4 = 0;
-*/
-static void rt68ice_usb_key_int(void) {
-    UBYTE curr_key_mods = (UBYTE)USB1_KEY_MODS;
-    UBYTE curr_key1 = (UBYTE)USB1_KEY1;
-    /*
-    UBYTE curr_key2 = (UBYTE)USB1_KEY2;
-    UBYTE curr_key3 = (UBYTE)USB1_KEY3;
-    UBYTE curr_key4 = (UBYTE)USB1_KEY4;
-    */
+static BOOL rt68ice_usb_key_present(const UBYTE *keys, UBYTE usage)
+{
+    UBYTE i;
 
+    for (i = 0; i < 4; i++)
+        if (keys[i] == usage)
+            return TRUE;
 
-    if (curr_key1 != last_key1) {
-        UBYTE idkb_code;
-        if (curr_key1 != 0) 
-            idkb_code = usb_to_idkb_map[curr_key1];              /* key pressed */
-        else                
-            idkb_code = usb_to_idkb_map[last_key1] | IDKB_BREAK; /* key released */
-
-        call_ikbdraw(idkb_code);
-        last_key1 = curr_key1;
-    }
-
-    /* Handle modifiers */
-    process_usb_modifiers(curr_key_mods);
+    return FALSE;
 }
 
-static void process_usb_modifiers(UBYTE current)
+static void rt68ice_usb_send_key(UBYTE usage, BOOL released)
 {
-    UBYTE changed = current ^ last_key_mods;
-    UBYTE bit;
-    UBYTE scancode;
+    UBYTE scancode = usb_to_idkb_map[usage];
 
-    for (bit = 0; bit < 8; bit++) {
-        if (!(changed & (1 << bit)))
-            continue;
-
-        scancode = modifier_scancodes[bit];
-        if (!scancode)
-            continue;
-
-        if (!(current & (1 << bit)))
-            scancode |= 0x80;       /* key release */
-
+    if (scancode != 0) {
+        if (released)
+            scancode |= IDKB_BREAK;
         call_ikbdraw(scancode);
     }
+}
 
-    last_key_mods = current;
+static void process_usb_modifier(UBYTE current, UBYTE mask, UBYTE scancode)
+{
+    BOOL was_down = (usb_last_key_mods & mask) != 0;
+    BOOL is_down = (current & mask) != 0;
+
+    if (was_down != is_down)
+        call_ikbdraw(is_down ? scancode : (scancode | IDKB_BREAK));
+}
+
+static void rt68ice_usb_key_int(void)
+{
+    UBYTE current_mods = (UBYTE)USB1_KEY_MODS;
+    UBYTE current_keys[4];
+    UBYTE i;
+
+    current_keys[0] = (UBYTE)USB1_KEY1;
+    current_keys[1] = (UBYTE)USB1_KEY2;
+    current_keys[2] = (UBYTE)USB1_KEY3;
+    current_keys[3] = (UBYTE)USB1_KEY4;
+
+    /* HID 0x01 means ErrorRollOver; ignore the incomplete report. */
+    for (i = 0; i < 4; i++)
+        if (current_keys[i] == 0x01)
+            return;
+
+    /* Release ordinary keys which disappeared from the new report. */
+    for (i = 0; i < 4; i++)
+        if (usb_last_keys[i] != 0 && !rt68ice_usb_key_present(current_keys, usb_last_keys[i]))
+            rt68ice_usb_send_key(usb_last_keys[i], TRUE);
+
+    process_usb_modifier(current_mods, (1 << 1), 0x2a); /* left Shift */
+    process_usb_modifier(current_mods, (1 << 5), 0x36); /* right Shift */
+    process_usb_modifier(current_mods, (1 << 0) | (1 << 4), 0x1d); /* Ctrl */
+    process_usb_modifier(current_mods, (1 << 2) | (1 << 6), 0x38); /* Alt */
+
+    /* Press ordinary keys which appeared in the new report. */
+    for (i = 0; i < 4; i++)
+        if (current_keys[i] != 0 && !rt68ice_usb_key_present(usb_last_keys, current_keys[i]))
+            rt68ice_usb_send_key(current_keys[i], FALSE);
+
+    for (i = 0; i < 4; i++)
+        usb_last_keys[i] = current_keys[i];
+    
+    usb_last_key_mods = current_mods;
 }
 
 
