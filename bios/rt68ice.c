@@ -24,6 +24,7 @@
 
 static void rt68ice_usb_mouse_int(void);
 static void rt68ice_usb_key_int(void);
+static void process_usb_modifiers(UBYTE);
 
 /* Custom registers */
 #define LED      *(volatile UBYTE*)(0x00f00000) // LED-mapped register base address
@@ -434,10 +435,20 @@ static const UBYTE usb_to_idkb_map[256] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // F0
 };
 
+static const UBYTE modifier_scancodes[8] = {
+    0x1d, /* bit 0: left Ctrl  */
+    0x2a, /* bit 1: left Shift */
+    0x38, /* bit 2: left Alt   */
+    0x00, /* bit 3: left GUI   */
+    0x1d, /* bit 4: right Ctrl */
+    0x36, /* bit 5: right Shift*/
+    0x38, /* bit 6: right Alt  */
+    0x00  /* bit 7: right GUI  */
+};
 #define IDKB_BREAK              0x80
 #define IDKB_CAPSLOCK           0x3a
 
-//static UBYTE last_key_mods = 0;
+static UBYTE last_key_mods = 0;
 static UBYTE last_key1 = 0;
 /*
 static UBYTE last_key2 = 0;
@@ -445,13 +456,14 @@ static UBYTE last_key3 = 0;
 static UBYTE last_key4 = 0;
 */
 static void rt68ice_usb_key_int(void) {
-    //UBYTE curr_key_mods = (UBYTE)USB1_KEY_MODS;
+    UBYTE curr_key_mods = (UBYTE)USB1_KEY_MODS;
     UBYTE curr_key1 = (UBYTE)USB1_KEY1;
     /*
     UBYTE curr_key2 = (UBYTE)USB1_KEY2;
     UBYTE curr_key3 = (UBYTE)USB1_KEY3;
     UBYTE curr_key4 = (UBYTE)USB1_KEY4;
     */
+
 
     if (curr_key1 != last_key1) {
         UBYTE idkb_code;
@@ -461,12 +473,34 @@ static void rt68ice_usb_key_int(void) {
             idkb_code = usb_to_idkb_map[last_key1] | IDKB_BREAK; /* key released */
 
         call_ikbdraw(idkb_code);
-        LEDS = (UWORD) idkb_code; /* Debug */
         last_key1 = curr_key1;
     }
 
-    // TODO: handle the other keys and modifiers
+    /* Handle modifiers */
+    process_usb_modifiers(curr_key_mods);
+}
 
+static void process_usb_modifiers(UBYTE current)
+{
+    UBYTE changed = current ^ last_key_mods;
+    UBYTE bit;
+    UBYTE scancode;
+
+    for (bit = 0; bit < 8; bit++) {
+        if (!(changed & (1 << bit)))
+            continue;
+
+        scancode = modifier_scancodes[bit];
+        if (!scancode)
+            continue;
+
+        if (!(current & (1 << bit)))
+            scancode |= 0x80;       /* key release */
+
+        call_ikbdraw(scancode);
+    }
+
+    last_key_mods = current;
 }
 
 
