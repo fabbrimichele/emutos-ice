@@ -600,12 +600,9 @@
 #  define CONF_STRAM_SIZE 7680 * 1024UL
 # endif
 
-/* TODO: */
-/*
 # ifndef CONF_WITH_SDMMC
 #  define CONF_WITH_SDMMC 1
 # endif
-*/
 /*
 # ifndef CONF_WITH_YM2149                        
 #  define CONF_WITH_YM2149 1                            
@@ -633,9 +630,11 @@
 # ifndef CONF_SERIAL_CONSOLE
 #  define CONF_SERIAL_CONSOLE 1
 # endif
+/*
 # ifndef ENABLE_KDEBUG
 #  define ENABLE_KDEBUG
 # endif
+*/
 #endif
 
 /*
