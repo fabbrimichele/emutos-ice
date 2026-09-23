@@ -6,10 +6,10 @@
 #include "spi.h"
 
 // Byte access -> odd addresses
-#define RT68F_SPI_DTLW  *(volatile UBYTE*)(0x4c0001) // Data LSB
-#define RT68F_SPI_DTHI  *(volatile UBYTE*)(0x4c0003) // Data MSB
-#define RT68F_SPI_CDST  *(volatile UBYTE*)(0x4c0005) // Command/Status
-#define RT68F_SPI_CONF  *(volatile UBYTE*)(0x4c0007) // Config
+#define RT68F_SPI_DTLW  *(volatile UBYTE*)(0xf20001) // Data LSB
+#define RT68F_SPI_DTHI  *(volatile UBYTE*)(0xf20003) // Data MSB
+#define RT68F_SPI_CDST  *(volatile UBYTE*)(0xf20005) // Command/Status
+#define RT68F_SPI_CONF  *(volatile UBYTE*)(0xf20007) // Config
 
 #define RT68F_SPI_CONF_TRSZ(x)  (((x)&0b00000011)<<3)   // Transfer size: 00=4-bit, 01=8-bit, 10=12-bit, 11=16-bit
 #define RT68F_SPI_CONF_CDIV(x)  (((x)&0b00000111)<<0)   // Clock divisor: 000=clk/2, 001=clk/4, ..., 111=clk/256
@@ -25,13 +25,13 @@
 
 // Identification mode: 
 // - transfer size = 8 bit
-// - clock divisor = 16 MHz / 64 = 250 KHz
-#define RT68F_SPI_IDENT_MODE    RT68F_SPI_CONF_TRSZ(0b01) | RT68F_SPI_CONF_CDIV(0b101)
+// - clock divisor = 25 MHz / 128 = 195.3125 KHz
+#define RT68F_SPI_IDENT_MODE    RT68F_SPI_CONF_TRSZ(0b01) | RT68F_SPI_CONF_CDIV(0b110)
 
 // SD mode: 
 // - transfer size = 8 bit
-// - clock divisor = 16 MHz / 2 = 8 MHz
-#define RT68F_SPI_SD_MODE       RT68F_SPI_CONF_TRSZ(0b01) | RT68F_SPI_CONF_CDIV(0b000)
+// - clock divisor = 25 MHz / 4 = 6.25 MHz
+#define RT68F_SPI_SD_MODE       RT68F_SPI_CONF_TRSZ(0b01) | RT68F_SPI_CONF_CDIV(0b001)
 
 // Commands
 #define RT68F_SPI_DEASSERT_CS   RT68F_SPI_CDST_SPIAD(0) | RT68F_SPI_CDST_IRQE(0) | RT68F_SPI_CDST_CS(0) | RT68F_SPI_CDST_START(0)

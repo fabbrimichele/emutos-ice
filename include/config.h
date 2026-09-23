@@ -600,12 +600,9 @@
 #  define CONF_STRAM_SIZE 7680 * 1024UL
 # endif
 
-/* TODO: */
-/*
 # ifndef CONF_WITH_SDMMC
 #  define CONF_WITH_SDMMC 1
 # endif
-*/
 /*
 # ifndef CONF_WITH_YM2149                        
 #  define CONF_WITH_YM2149 1                            
