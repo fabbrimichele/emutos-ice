@@ -1,5 +1,5 @@
 /*
- * rt68ice_spi.c - SPI interface for rt68f SD card driver
+ * rt68ice_spi.c - SPI interface for rt68ice SD card driver
  */
 
 #include "emutos.h"
@@ -39,43 +39,41 @@
 #define RT68ICE_SPI_START         RT68ICE_SPI_CDST_SPIAD(0) | RT68ICE_SPI_CDST_IRQE(0) | RT68ICE_SPI_CDST_CS(1) | RT68ICE_SPI_CDST_START(1)
 
 
-// TODO: it has to be integrated in the other files, refert to the repository emutos-rt68f
-
 void spi_clock_ident(void)
 {
-    KDEBUG(("rt68f: spi_clock_ident, conf = 0x%02x\n", RT68ICE_SPI_IDENT_MODE));
+    KDEBUG(("rt68ice: spi_clock_ident, conf = 0x%02x\n", RT68ICE_SPI_IDENT_MODE));
     RT68ICE_SPI_CONF = RT68ICE_SPI_IDENT_MODE;
 }
 
 void spi_clock_mmc(void)
 {
     // Not used for SD cards    
-    KDEBUG(("rt68f: spi_clock_mmc\n"));
+    KDEBUG(("rt68ice: spi_clock_mmc\n"));
 }
 
 void spi_clock_sd(void)
 {
-    KDEBUG(("rt68f: spi_clock_sd, conf = 0x%02x\n", RT68ICE_SPI_SD_MODE));
+    KDEBUG(("rt68ice: spi_clock_sd, conf = 0x%02x\n", RT68ICE_SPI_SD_MODE));
     RT68ICE_SPI_CONF = RT68ICE_SPI_SD_MODE;
 }
 
 void spi_cs_assert(void)
 {
-    // KDEBUG(("rt68f: spi_cs_assert, cdst = 0x%02x\n", RT68ICE_SPI_ASSERT_CS));
+    // KDEBUG(("rt68ice: spi_cs_assert, cdst = 0x%02x\n", RT68ICE_SPI_ASSERT_CS));
     RT68ICE_SPI_CDST = RT68ICE_SPI_ASSERT_CS;    
     spi_send_byte(0xff);  // dummy byte to force a write to the register
 }
 
 void spi_cs_unassert(void)
 {   
-    // KDEBUG(("rt68f: spi_cs_unassert, cdst = 0x%02x\n", RT68ICE_SPI_DEASSERT_CS));
+    // KDEBUG(("rt68ice: spi_cs_unassert, cdst = 0x%02x\n", RT68ICE_SPI_DEASSERT_CS));
     RT68ICE_SPI_CDST = RT68ICE_SPI_DEASSERT_CS;
     spi_send_byte(0xff);  // dummy byte to force a write to the register
 }
 
 void spi_initialise(void)
 {
-    KDEBUG(("rt68f: spi_initialise, conf = 0x%02x\n", RT68ICE_SPI_IDENT_MODE));
+    KDEBUG(("rt68ice: spi_initialise, conf = 0x%02x\n", RT68ICE_SPI_IDENT_MODE));
     RT68ICE_SPI_CONF = RT68ICE_SPI_IDENT_MODE;
 }
 
