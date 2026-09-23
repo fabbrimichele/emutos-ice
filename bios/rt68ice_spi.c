@@ -30,8 +30,8 @@
 
 // SD mode: 
 // - transfer size = 8 bit
-// - clock divisor = 25 MHz / 4 = 6.25 MHz
-#define RT68F_SPI_SD_MODE       RT68F_SPI_CONF_TRSZ(0b01) | RT68F_SPI_CONF_CDIV(0b001)
+// - clock divisor = 25 MHz / 2 = 12.5 MHz
+#define RT68F_SPI_SD_MODE       RT68F_SPI_CONF_TRSZ(0b01) | RT68F_SPI_CONF_CDIV(0b000)
 
 // Commands
 #define RT68F_SPI_DEASSERT_CS   RT68F_SPI_CDST_SPIAD(0) | RT68F_SPI_CDST_IRQE(0) | RT68F_SPI_CDST_CS(0) | RT68F_SPI_CDST_START(0)

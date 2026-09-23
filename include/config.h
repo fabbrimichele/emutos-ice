@@ -630,9 +630,11 @@
 # ifndef CONF_SERIAL_CONSOLE
 #  define CONF_SERIAL_CONSOLE 1
 # endif
+/*
 # ifndef ENABLE_KDEBUG
 #  define ENABLE_KDEBUG
 # endif
+*/
 #endif
 
 /*
