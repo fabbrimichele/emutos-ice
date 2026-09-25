@@ -296,7 +296,13 @@ void rt68ice_rs232_int_c(void)
 
     // Read and push serial input byte
     UBYTE c = UART_RBR;
-    push_serial_iorec(c);
+
+    #if CONF_SERIAL_CONSOLE && !CONF_SERIAL_CONSOLE_POLLING_MODE
+        /* Serial-console input must enter the IKBD queue used by Bconin(2). */
+        push_ascii_ikbdiorec(c);
+    #else
+        push_serial_iorec(c);
+    #endif
 }
 
 BOOL rt68ice_rs232_can_write(void)
