@@ -239,9 +239,11 @@ WORD mode, monitor;
  */
 static int change_rt68ice_rez(WORD *newres)
 {
-     /* Switch beetween 640x240 and 640x480 */
-
-    *newres = rt68ice_vgetmode() == 2 ? 1 : 2;
+    /* Switch between the standard RT68ICE medium and high modes.
+     * rt68ice_vgetmode() returns a VIDEL-style mode descriptor, not the
+     * FPGA hardware mode number, so use Getrez() for this ST-style choice.
+     */
+    *newres = (Getrez() == ST_HIGH) ? ST_MEDIUM : ST_HIGH;
 
     return 1;    
 }

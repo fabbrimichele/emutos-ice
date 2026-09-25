@@ -66,9 +66,12 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 
 #define VIDEO_IRQ_VBL       0001
 
-#define MODE_320X240_8BP   0x00  // 320x240 8 bitplanes
-#define MODE_640X240_4BP   0x01  // 640x240 4 bitplanes
-#define MODE_640X480_2BP   0x02  // 640x480 2 bitplanes
+#define MODE_320X240_4BP   0x00
+#define MODE_640X240_2BP   0x01
+#define MODE_640X480_1BP   0x02
+#define MODE_320X240_8BP   0x03
+#define MODE_640X240_4BP   0x04
+#define MODE_640X480_2BP   0x05
 
 /* USB */
 // Global interrupt registers
@@ -143,6 +146,52 @@ static UBYTE current_screen_mode;
 ULONG* pword_vga_palette = (ULONG *)VIDEO_PLTE;
 const UBYTE *rt68ice_screenbase;
 
+struct rt68ice_video_mode {
+    UBYTE hardware_mode;
+    UWORD videl_mode;
+    UWORD width;
+    UWORD height;
+    UBYTE planes;
+};
+
+/* Hardware modes 0-2 are selected by the standard ST XBIOS resolution
+ * indices.  The remaining modes are available through their VIDEL-style
+ * description, while the FPGA register itself remains hardware-specific. */
+static const struct rt68ice_video_mode rt68ice_video_modes[] = {
+    { MODE_320X240_4BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_4BPP, 320, 240, 4 },
+    { MODE_640X240_2BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_80COL | VIDEL_2BPP, 640, 240, 2 },
+    { MODE_640X480_1BP, VIDEL_VGA | VIDEL_80COL | VIDEL_1BPP, 640, 480, 1 },
+    { MODE_320X240_8BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_8BPP, 320, 240, 8 },
+    { MODE_640X240_4BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_80COL | VIDEL_4BPP, 640, 240, 4 },
+    { MODE_640X480_2BP, VIDEL_VGA | VIDEL_80COL | VIDEL_2BPP, 640, 480, 2 }
+};
+
+static const struct rt68ice_video_mode *rt68ice_video_mode_from_hardware(UBYTE hardware_mode)
+{
+    UWORD i;
+
+    for (i = 0; i < ARRAY_SIZE(rt68ice_video_modes); i++) {
+        if (rt68ice_video_modes[i].hardware_mode == hardware_mode)
+            return &rt68ice_video_modes[i];
+    }
+
+    /* FPGA modes 6 and 7 fall back to 640x480 with one bitplane. */
+    return &rt68ice_video_modes[MODE_640X480_1BP];
+}
+
+static const struct rt68ice_video_mode *rt68ice_video_mode_from_videl(UWORD videl_mode)
+{
+    UWORD i;
+
+    videl_mode &= VIDEL_VALID;
+    for (i = 0; i < ARRAY_SIZE(rt68ice_video_modes); i++) {
+        if (rt68ice_video_modes[i].videl_mode == videl_mode)
+            return &rt68ice_video_modes[i];
+    }
+
+    return NULL;
+}
+
 /* 
  * Initialize graphic palette and video mode 
  */
@@ -174,13 +223,13 @@ void rt68ice_screen_init(void)
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
 
     /* Set screen mode and enable vblank interrupt */
-    rt68ice_set_screen_mode(MODE_640X480_2BP);
-    //rt68ice_set_screen_mode(MODE_640X240_4BP);
+    rt68ice_set_screen_mode(MODE_640X480_1BP);
+    sshiftmod = ST_HIGH;
 }
 
 ULONG rt68ice_vram_size(void)
 {
-    return 70800UL;
+    return 75UL * 1024UL;
 }
 
 /*
@@ -193,40 +242,17 @@ WORD rt68ice_get_palette(void)
 
 WORD rt68ice_vgetmode(void)
 {
-    return current_screen_mode;
+    return rt68ice_video_mode_from_hardware(current_screen_mode)->videl_mode;
 }
 
 void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
 {
-    switch (current_screen_mode)
-    {
-        /* TODO: MODE_320X240_8BP resolution doesn't work 
-                 the problem might be the number of planes,
-                 I tried to set it to 4 and it wasn't stuck.
-                 (Screen wasn't shown properly because the
-                 RT68ICE low res uses 8 planes)
-        */
-        case MODE_320X240_8BP:
-            *hz_rez = 320;
-            *vt_rez = 240;
-            *planes = 8; /* TODO: 8 planes doesn't work*/
-            break;
+    const struct rt68ice_video_mode *mode;
 
-        case MODE_640X240_4BP:
-            *hz_rez = 640;
-            *vt_rez = 240;
-            *planes = 4;
-            break;
-
-        case MODE_640X480_2BP:
-            *hz_rez = 640;
-            *vt_rez = 480;
-            *planes = 2;
-            break;
-
-        default:
-            break;
-    }    
+    mode = rt68ice_video_mode_from_hardware(current_screen_mode);
+    *hz_rez = mode->width;
+    *vt_rez = mode->height;
+    *planes = mode->planes;
 }
 
 void rt68ice_setphys(const UBYTE *addr)
@@ -241,6 +267,9 @@ const UBYTE *rt68ice_physbase(void)
 
 void rt68ice_set_screen_mode(UBYTE screen_mode) 
 {
+    if (screen_mode > MODE_640X480_2BP)
+        screen_mode = MODE_640X480_1BP;
+
     VIDEO_CTRL = screen_mode;
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
     current_screen_mode = screen_mode;
@@ -248,34 +277,42 @@ void rt68ice_set_screen_mode(UBYTE screen_mode)
 
 WORD rt68ice_check_moderez(WORD moderez)
 {
-    return (moderez == current_screen_mode)?0:moderez;
+    const struct rt68ice_video_mode *mode;
+    WORD rez;
+
+    if (moderez < 0) {
+        rez = moderez & 0x00ff;
+        if (rez < ST_LOW || rez > ST_HIGH)
+            return 0;
+        mode = &rt68ice_video_modes[rez];
+    } else {
+        mode = rt68ice_video_mode_from_videl((UWORD)moderez);
+        if (!mode)
+            return 0;
+    }
+
+    return (mode->hardware_mode == current_screen_mode) ? 0 : moderez;
 }
 
-/*
-    Used by setscreen function (screen.c).
-    It uses ST resolutions screen modes (low and med) but for 
-    640x400 and 640x480, this may confuse  some applications. 
-    A better approach could be the amiga one with VIDEL.
-*/
+/* Used by Setscreen().  The FPGA mode numbers are independent of the
+ * Atari XBIOS resolution indices. */
 void rt68ice_setrez(WORD rez, WORD videlmode)
 {
-    switch (rez)
-    {
-        case 0:
-            rt68ice_set_screen_mode(MODE_320X240_8BP);
-            break;
+    const struct rt68ice_video_mode *mode;
 
-        case 1:
-            rt68ice_set_screen_mode(MODE_640X240_4BP);
-            break;
-
-        case 2:
-            rt68ice_set_screen_mode(MODE_640X480_2BP);
-            break;
-
-        default:
-            break;
+    if (rez >= ST_LOW && rez <= ST_HIGH) {
+        mode = &rt68ice_video_modes[rez];
+        sshiftmod = rez;
+    } else if (rez == FALCON_REZ) {
+        mode = rt68ice_video_mode_from_videl((UWORD)videlmode);
+        if (!mode)
+            return;
+        sshiftmod = FALCON_REZ;
+    } else {
+        return;
     }
+
+    rt68ice_set_screen_mode(mode->hardware_mode);
 }
 
 /******************************************************************************/
