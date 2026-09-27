@@ -10,6 +10,15 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 - Video modes: 320x240 with 4 or 8 bitplanes, 640x240 with 2 or 4
   bitplanes, and 640x480 with 1 or 2 bitplanes.  The 4/2/1-bitplane modes
   are selected through the standard ST Low/Medium/High resolution indices.
+  The 8-bitplane mode has full EmuTOS VDI support for 256 palette entries;
+  the FPGA receives 24-bit RGB palette values.  The lower-depth modes retain
+  ST-compatible palette handling (including white background/black foreground
+  in 640x480 monochrome mode).
+- Atari ST reference modes, to be added as hardware modes: ST Low is
+  320x200 with 4 bitplanes (16 colours), ST Medium is 640x200 with 2
+  bitplanes (4 colours), and ST High is 640x400 with 1 bitplane (monochrome).
+  The current 320x240, 640x240, and 640x480 modes are vertically extended
+  RT68ICE variants, not exact ST timings.
 - USB keyboard and mouse.
 - 8 MiB SDRAM.
 - Serial console at 57600 baud.
