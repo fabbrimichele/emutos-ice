@@ -147,12 +147,13 @@ static volatile ULONG * const pword_vga_palette = (volatile ULONG *)VIDEO_PLTE;
 const UBYTE *rt68ice_screenbase;
 
 /* The ST XBIOS palette uses three bits per component: 0x0RGB. */
-static UWORD rt68ice_palette[16] = {
+static const UWORD rt68ice_default_st_palette[16] = {
     0x0fff, 0x0f00, 0x00f0, 0x0ff0,
     0x000f, 0x0f0f, 0x00ff, 0x0555,
     0x0333, 0x0f33, 0x03f3, 0x0ff3,
     0x033f, 0x0f3f, 0x03ff, 0x0000
 };
+static ULONG rt68ice_palette[256];
 
 struct rt68ice_video_mode {
     UBYTE hardware_mode;
@@ -212,18 +213,32 @@ static ULONG rt68ice_palette_to_rgb(UWORD color)
          | (blue * 255UL / 7UL);
 }
 
+static UWORD rt68ice_rgb_to_palette(ULONG color)
+{
+    UWORD red = ((color >> 16) & 0xff) * 7UL / 255UL;
+    UWORD green = ((color >> 8) & 0xff) * 7UL / 255UL;
+    UWORD blue = (color & 0xff) * 7UL / 255UL;
+
+    return (red << 8) | (green << 4) | blue;
+}
+
 static void rt68ice_write_palette(WORD color_num)
 {
-    pword_vga_palette[color_num] = rt68ice_palette_to_rgb(rt68ice_palette[color_num]);
+    pword_vga_palette[color_num] = rt68ice_palette[color_num];
+}
+
+static void rt68ice_write_st_palette(WORD color_num, UWORD color)
+{
+    rt68ice_palette[color_num] = rt68ice_palette_to_rgb(color);
+    rt68ice_write_palette(color_num);
 }
 
 void rt68ice_setpalette(const UWORD *palette)
 {
     WORD i;
 
-    for (i = 0; i < ARRAY_SIZE(rt68ice_palette); i++) {
-        rt68ice_palette[i] = palette[i] & 0x0777;
-        rt68ice_write_palette(i);
+    for (i = 0; i < ARRAY_SIZE(rt68ice_default_st_palette); i++) {
+        rt68ice_write_st_palette(i, palette[i] & 0x0777);
     }
 }
 
@@ -231,22 +246,46 @@ WORD rt68ice_setcolor(WORD color_num, WORD color)
 {
     WORD old_color;
 
-    color_num &= 0x000f;
-    old_color = rt68ice_palette[color_num];
+    if (rt68ice_video_mode_from_hardware(current_screen_mode)->planes == 8)
+        color_num &= 0x00ff;
+    else
+        color_num &= 0x000f;
+
+    old_color = rt68ice_rgb_to_palette(rt68ice_palette[color_num]);
     if (color >= 0) {
-        rt68ice_palette[color_num] = color & 0x0777;
-        rt68ice_write_palette(color_num);
+        rt68ice_write_st_palette(color_num, color & 0x0777);
     }
 
     return old_color;
+}
+
+void rt68ice_set_vdi_color(WORD color_num, WORD red, WORD green, WORD blue)
+{
+    ULONG color;
+
+    color_num &= 0x00ff;
+    color = ((ULONG)red * 255UL / 1000UL) << 16;
+    color |= ((ULONG)green * 255UL / 1000UL) << 8;
+    color |= (ULONG)blue * 255UL / 1000UL;
+    rt68ice_palette[color_num] = color;
+    rt68ice_write_palette(color_num);
+}
+
+void rt68ice_get_vdi_color(WORD color_num, WORD *red, WORD *green, WORD *blue)
+{
+    ULONG color = rt68ice_palette[color_num & 0x00ff];
+
+    *red = ((color >> 16) & 0xff) * 1000UL / 255UL;
+    *green = ((color >> 8) & 0xff) * 1000UL / 255UL;
+    *blue = (color & 0xff) * 1000UL / 255UL;
 }
 
 static void rt68ice_set_default_palette(void)
 {
     WORD i;
 
-    for (i = 0; i < ARRAY_SIZE(rt68ice_palette); i++)
-        rt68ice_write_palette(i);
+    for (i = 0; i < ARRAY_SIZE(rt68ice_default_st_palette); i++)
+        rt68ice_write_st_palette(i, rt68ice_default_st_palette[i]);
 }
 
 /* 
@@ -317,10 +356,8 @@ void rt68ice_set_screen_mode(UBYTE screen_mode)
 
     /* ST high resolution is monochrome: white paper, black ink. */
     if (screen_mode == MODE_640X480_1BP) {
-        rt68ice_palette[0] = 0x0fff;
-        rt68ice_palette[1] = 0x0000;
-        rt68ice_write_palette(0);
-        rt68ice_write_palette(1);
+        rt68ice_write_st_palette(0, 0x0fff);
+        rt68ice_write_st_palette(1, 0x0000);
     }
 }
 

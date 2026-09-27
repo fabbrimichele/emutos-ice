@@ -14,6 +14,7 @@
 #include "has.h"
 #include "xbiosbind.h"
 #include "lineavars.h"
+#include "../bios/rt68ice.h"
 
 #if EXTENDED_PALETTE
 #define MAXCOLOURS  256
@@ -197,6 +198,28 @@ static const WORD videl_palette2[240][3] =
     { 133, 267, 0 }, { 200, 267, 0 }, { 267, 267, 0 }, { 267, 200, 0 },
     { 267, 133, 0 }, { 267, 67, 0 }, { 1000, 1000, 1000 }, { 0, 0, 0 }
 };
+#endif
+
+#ifdef MACHINE_RT68ICE
+/* The first 16 colours are ST-compatible.  Fill the remaining entries with
+ * a 6x6x6 RGB cube followed by greys; entry 255 remains black for pen 1. */
+static void init_rt68ice_palette2(void)
+{
+    WORD i;
+
+    for (i = 0; i < 216; i++) {
+        req_col2[i][0] = (i / 36) * 200;
+        req_col2[i][1] = ((i / 6) % 6) * 200;
+        req_col2[i][2] = (i % 6) * 200;
+    }
+    for (; i < 239; i++) {
+        WORD grey = (i - 216) * 1000 / 22;
+        req_col2[i][0] = grey;
+        req_col2[i][1] = grey;
+        req_col2[i][2] = grey;
+    }
+    req_col2[239][0] = req_col2[239][1] = req_col2[239][2] = 0;
+}
 #endif
 
 
@@ -535,6 +558,11 @@ static void set_color(WORD colnum, WORD *rgb)
     g = rgb[1];
     b = rgb[2];
 
+#ifdef MACHINE_RT68ICE
+    rt68ice_set_vdi_color(hwreg, r, g, b);
+    return;
+#endif
+
 #if CONF_WITH_VIDEL
     if (has_videl)
     {
@@ -711,6 +739,10 @@ void init_colors(void)
 
     /* set up palette */
     memcpy(REQ_COL, st_palette, sizeof(st_palette));    /* use ST as default */
+
+#ifdef MACHINE_RT68ICE
+    init_rt68ice_palette2();
+#endif
 
 #if CONF_WITH_VIDEL
     if (has_videl)
@@ -896,6 +928,11 @@ void vdi_vq_color(Vwk *vwk)
      */
     colnum = INTIN[0];          /* may have been munged on TT system, see above */
     hwreg = MAP_COL[colnum] & (numcolors-1);    /* get hardware register */
+
+#ifdef MACHINE_RT68ICE
+    rt68ice_get_vdi_color(hwreg, &INTOUT[1], &INTOUT[2], &INTOUT[3]);
+    return;
+#endif
 
 #if CONF_WITH_VIDEL
     if (has_videl)
