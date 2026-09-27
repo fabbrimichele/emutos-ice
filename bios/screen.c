@@ -1203,8 +1203,12 @@ void setpalette(const UWORD *palettePtr)
     }
     KDEBUG((")\n"));
 #endif
+#ifdef MACHINE_RT68ICE
+    rt68ice_setpalette(palettePtr);
+#else
     /* next VBL will do this */
     colorptr = palettePtr;
+#endif
 }
 
 /*
@@ -1218,6 +1222,8 @@ WORD setcolor(WORD colorNum, WORD color)
 {
 #ifdef MACHINE_AMIGA
     return amiga_setcolor(colorNum, color);
+#elif defined(MACHINE_RT68ICE)
+    return rt68ice_setcolor(colorNum, color);
 #elif CONF_WITH_ATARI_VIDEO
     return atari_setcolor(colorNum, color);
 #else

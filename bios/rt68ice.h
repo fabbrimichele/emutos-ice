@@ -9,6 +9,8 @@ extern void rt68ice_init(void);
 void rt68ice_screen_init(void);
 ULONG rt68ice_vram_size(void);
 WORD rt68ice_get_palette(void);
+void rt68ice_setpalette(const UWORD *palette);
+WORD rt68ice_setcolor(WORD color_num, WORD color);
 void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez);
 void rt68ice_setrez(WORD rez, WORD videlmode);
 WORD rt68ice_check_moderez(WORD moderez);

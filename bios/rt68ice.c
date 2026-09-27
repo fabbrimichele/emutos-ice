@@ -143,8 +143,16 @@ extern void rt68ice_init(void)
 /* Screen                                                                     */
 /******************************************************************************/
 static UBYTE current_screen_mode;
-ULONG* pword_vga_palette = (ULONG *)VIDEO_PLTE;
+static volatile ULONG * const pword_vga_palette = (volatile ULONG *)VIDEO_PLTE;
 const UBYTE *rt68ice_screenbase;
+
+/* The ST XBIOS palette uses three bits per component: 0x0RGB. */
+static UWORD rt68ice_palette[16] = {
+    0x0fff, 0x0f00, 0x00f0, 0x0ff0,
+    0x000f, 0x0f0f, 0x00ff, 0x0555,
+    0x0333, 0x0f33, 0x03f3, 0x0ff3,
+    0x033f, 0x0f3f, 0x03ff, 0x0000
+};
 
 struct rt68ice_video_mode {
     UBYTE hardware_mode;
@@ -192,28 +200,61 @@ static const struct rt68ice_video_mode *rt68ice_video_mode_from_videl(UWORD vide
     return NULL;
 }
 
+static ULONG rt68ice_palette_to_rgb(UWORD color)
+{
+    ULONG red = (color >> 8) & 0x07;
+    ULONG green = (color >> 4) & 0x07;
+    ULONG blue = color & 0x07;
+
+    /* Expand the ST's 3-bit components to FPGA 0x00RRGGBB. */
+    return ((red * 255UL / 7UL) << 16)
+         | ((green * 255UL / 7UL) << 8)
+         | (blue * 255UL / 7UL);
+}
+
+static void rt68ice_write_palette(WORD color_num)
+{
+    pword_vga_palette[color_num] = rt68ice_palette_to_rgb(rt68ice_palette[color_num]);
+}
+
+void rt68ice_setpalette(const UWORD *palette)
+{
+    WORD i;
+
+    for (i = 0; i < ARRAY_SIZE(rt68ice_palette); i++) {
+        rt68ice_palette[i] = palette[i] & 0x0777;
+        rt68ice_write_palette(i);
+    }
+}
+
+WORD rt68ice_setcolor(WORD color_num, WORD color)
+{
+    WORD old_color;
+
+    color_num &= 0x000f;
+    old_color = rt68ice_palette[color_num];
+    if (color >= 0) {
+        rt68ice_palette[color_num] = color & 0x0777;
+        rt68ice_write_palette(color_num);
+    }
+
+    return old_color;
+}
+
+static void rt68ice_set_default_palette(void)
+{
+    WORD i;
+
+    for (i = 0; i < ARRAY_SIZE(rt68ice_palette); i++)
+        rt68ice_write_palette(i);
+}
+
 /* 
  * Initialize graphic palette and video mode 
  */
 void rt68ice_screen_init(void)
 {
-    // Set palette colors (xxRRGGBB):
-    pword_vga_palette[0x0] = 0x00FFFFFF; // White
-    pword_vga_palette[0x1] = 0x00FF0000; // Red
-    pword_vga_palette[0x2] = 0x0000FF00; // Green
-    pword_vga_palette[0x3] = 0x00000000; // Black
-    pword_vga_palette[0x4] = 0x000000FF; // Blue
-    pword_vga_palette[0x5] = 0x00FFFF00; // Yellow
-    pword_vga_palette[0x6] = 0x00FF00FF; // Magenta    
-    pword_vga_palette[0x7] = 0x0000FFFF; // Cyan
-    pword_vga_palette[0x8] = 0x00808080; // Medium Gray
-    pword_vga_palette[0x9] = 0x00800000; // Dark Red
-    pword_vga_palette[0xa] = 0x00008000; // Dark Green
-    pword_vga_palette[0xb] = 0x00000080; // Dark Blue
-    pword_vga_palette[0xc] = 0x00808000; // Olive
-    pword_vga_palette[0xd] = 0x00800080; // Purple
-    pword_vga_palette[0xe] = 0x00008080; // Teal
-    pword_vga_palette[0xf] = 0x00404040; // Dark Gray
+    rt68ice_set_default_palette();
 
     /* Set VBL interrupt routine */
     VEC_LEVEL4 = rt68ice_vbl_int;
@@ -237,7 +278,7 @@ ULONG rt68ice_vram_size(void)
  */
 WORD rt68ice_get_palette(void)
 {
-    return 4096;
+    return 1 << rt68ice_video_mode_from_hardware(current_screen_mode)->planes;
 }
 
 WORD rt68ice_vgetmode(void)
@@ -273,6 +314,14 @@ void rt68ice_set_screen_mode(UBYTE screen_mode)
     VIDEO_CTRL = screen_mode;
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
     current_screen_mode = screen_mode;
+
+    /* ST high resolution is monochrome: white paper, black ink. */
+    if (screen_mode == MODE_640X480_1BP) {
+        rt68ice_palette[0] = 0x0fff;
+        rt68ice_palette[1] = 0x0000;
+        rt68ice_write_palette(0);
+        rt68ice_write_palette(1);
+    }
 }
 
 WORD rt68ice_check_moderez(WORD moderez)
