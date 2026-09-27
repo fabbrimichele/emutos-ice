@@ -18,6 +18,7 @@
 #include "emutos.h"
 #include "aesbind.h"
 #include "obdefs.h"
+#include "gsxdefs.h"
 #include "optimize.h"
 
 #include "deskbind.h"
@@ -231,22 +232,6 @@ WORD mode, monitor;
 }
 #endif
 
-#ifdef MACHINE_RT68ICE
-/*
- *  change_st_rez(): change desktop rt68ice resolution
- *  returns:    0   user cancelled change
- *              1   user wants to change; newres is updated with new resolution.
- */
-static int change_rt68ice_rez(WORD *newres)
-{
-     /* Switch beetween 640x240 and 640x480 */
-
-    *newres = rt68ice_vgetmode() == 2 ? 1 : 2;
-
-    return 1;    
-}
-#endif
-
 #ifdef MACHINE_AMIGA
 /* This assumes that inside ADAMIREZ dialog, buttons are sorted
  * left to right then top to bottom. */
@@ -318,6 +303,87 @@ WORD oldmode;
 }
 #endif
 
+#ifdef MACHINE_RT68ICE
+#define ADRT68RZ        rt68ice_rez_tree
+#define RT68RZ_MODE0    3
+#define RT68RZ_OK       9
+
+/* This is an RT68ICE-only resolution-selector resource tree. */
+static OBJECT rt68ice_rez_tree[] =
+{
+    { -1,  1, 10, G_BOX,    FL3DBAK,                          OUTLINED, (LONG)69888L,                 0,  0, 38, 14 },
+    {  2, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"RT68ICE SCREEN MODE",  9,  1, 20,  1 },
+    {  3, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"Resolution / bitplanes", 8,  3, 22,  1 },
+    {  4, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/4",             1,  5, 11,  1 },
+    {  5, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/2",            13,  5, 11,  1 },
+    {  6, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/1",            25,  5, 11,  1 },
+    {  7, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/8",             1,  7, 11,  1 },
+    {  8, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/4",            13,  7, 11,  1 },
+    {  9, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/2",            25,  7, 11,  1 },
+    { 10, -1, -1, G_BUTTON, SELECTABLE|DEFAULT|EXIT|FL3DBAK|FL3DIND,
+                                                               NORMAL,   (LONG)"OK",                  8, 11,  9,  1 },
+    {  0, -1, -1, G_BUTTON, SELECTABLE|EXIT|LASTOB|FL3DBAK|FL3DIND,
+                                                               NORMAL,   (LONG)"Cancel",             21, 11,  9,  1 }
+};
+static BOOL rt68ice_rez_tree_fixed;
+
+static const WORD rt68ice_mode_from_button[] =
+{
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_4BPP,               /* 320x240x4 */
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_80COL|VIDEL_2BPP,   /* 640x240x2 */
+    VIDEL_VGA|VIDEL_80COL|VIDEL_1BPP,                  /* 640x480x1 */
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_8BPP,               /* 320x240x8 */
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_80COL|VIDEL_4BPP,   /* 640x240x4 */
+    VIDEL_VGA|VIDEL_80COL|VIDEL_2BPP                   /* 640x480x2 */
+};
+
+static int change_rt68ice_rez(WORD *newres,WORD *newmode)
+{
+OBJECT *tree, *obj;
+WORD oldmode;
+int i, selected;
+
+    oldmode = rt68ice_vgetmode();
+    selected = -1;
+    for (i = 0; i < ARRAY_SIZE(rt68ice_mode_from_button); i++) {
+        if (oldmode == rt68ice_mode_from_button[i]) {
+            selected = i;
+            break;
+        }
+    }
+
+    tree = ADRT68RZ;
+    if (!rt68ice_rez_tree_fixed) {
+        for (i = 0; i < ARRAY_SIZE(rt68ice_rez_tree); i++) {
+            tree[i].ob_x *= gl_wchar;
+            tree[i].ob_y *= gl_hchar;
+            tree[i].ob_width *= gl_wchar;
+            tree[i].ob_height *= gl_hchar;
+        }
+        rt68ice_rez_tree_fixed = TRUE;
+    }
+
+    for (i = 0, obj = tree+RT68RZ_MODE0; i < ARRAY_SIZE(rt68ice_mode_from_button); i++, obj++) {
+        if (i == selected)
+            obj->ob_state |= SELECTED;
+        else
+            obj->ob_state &= ~SELECTED;
+    }
+
+    inf_show(tree,ROOT);
+    if (inf_what(tree,RT68RZ_OK) == 0)
+        return 0;
+
+    i = inf_gindex(tree,RT68RZ_MODE0,ARRAY_SIZE(rt68ice_mode_from_button));
+    if ((i < 0) || (i >= ARRAY_SIZE(rt68ice_mode_from_button)) || (i == selected))
+        return 0;
+
+    *newres = FALCON_REZ;
+    *newmode = rt68ice_mode_from_button[i];
+    return 1;
+}
+#endif
+
 /*
  *  change_resolution(): change desktop resolution
  *
@@ -336,7 +402,7 @@ int change_resolution(WORD *newres,WORD *newmode)
 #endif
 
 #ifdef MACHINE_RT68ICE
-    return change_rt68ice_rez(newres);
+    return change_rt68ice_rez(newres,newmode);
 #endif
 
 #if CONF_WITH_VIDEL

@@ -905,7 +905,7 @@ static WORD do_optnmenu(WORD item)
                 {
                     /* Dummy case for conditional compilation */
                 }
-#if CONF_WITH_VIDEL || defined(MACHINE_AMIGA)
+#if CONF_WITH_VIDEL || defined(MACHINE_AMIGA) || defined(MACHINE_RT68ICE)
             else if (newres == FALCON_REZ)
                 shel_write(SHW_RESCHNG,newmode,1,NULL,NULL);
 #endif

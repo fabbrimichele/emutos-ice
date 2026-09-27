@@ -66,9 +66,12 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 
 #define VIDEO_IRQ_VBL       0001
 
-#define MODE_320X240_8BP   0x00  // 320x240 8 bitplanes
-#define MODE_640X240_4BP   0x01  // 640x240 4 bitplanes
-#define MODE_640X480_2BP   0x02  // 640x480 2 bitplanes
+#define MODE_320X240_4BP   0x00
+#define MODE_640X240_2BP   0x01
+#define MODE_640X480_1BP   0x02
+#define MODE_320X240_8BP   0x03
+#define MODE_640X240_4BP   0x04
+#define MODE_640X480_2BP   0x05
 
 /* USB */
 // Global interrupt registers
@@ -140,31 +143,118 @@ extern void rt68ice_init(void)
 /* Screen                                                                     */
 /******************************************************************************/
 static UBYTE current_screen_mode;
-ULONG* pword_vga_palette = (ULONG *)VIDEO_PLTE;
+static volatile ULONG * const pword_vga_palette = (volatile ULONG *)VIDEO_PLTE;
 const UBYTE *rt68ice_screenbase;
+
+/* The ST XBIOS palette uses three bits per component: 0x0RGB. */
+static UWORD rt68ice_palette[16] = {
+    0x0fff, 0x0f00, 0x00f0, 0x0ff0,
+    0x000f, 0x0f0f, 0x00ff, 0x0555,
+    0x0333, 0x0f33, 0x03f3, 0x0ff3,
+    0x033f, 0x0f3f, 0x03ff, 0x0000
+};
+
+struct rt68ice_video_mode {
+    UBYTE hardware_mode;
+    UWORD videl_mode;
+    UWORD width;
+    UWORD height;
+    UBYTE planes;
+};
+
+/* Hardware modes 0-2 are selected by the standard ST XBIOS resolution
+ * indices.  The remaining modes are available through their VIDEL-style
+ * description, while the FPGA register itself remains hardware-specific. */
+static const struct rt68ice_video_mode rt68ice_video_modes[] = {
+    { MODE_320X240_4BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_4BPP, 320, 240, 4 },
+    { MODE_640X240_2BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_80COL | VIDEL_2BPP, 640, 240, 2 },
+    { MODE_640X480_1BP, VIDEL_VGA | VIDEL_80COL | VIDEL_1BPP, 640, 480, 1 },
+    { MODE_320X240_8BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_8BPP, 320, 240, 8 },
+    { MODE_640X240_4BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_80COL | VIDEL_4BPP, 640, 240, 4 },
+    { MODE_640X480_2BP, VIDEL_VGA | VIDEL_80COL | VIDEL_2BPP, 640, 480, 2 }
+};
+
+static const struct rt68ice_video_mode *rt68ice_video_mode_from_hardware(UBYTE hardware_mode)
+{
+    UWORD i;
+
+    for (i = 0; i < ARRAY_SIZE(rt68ice_video_modes); i++) {
+        if (rt68ice_video_modes[i].hardware_mode == hardware_mode)
+            return &rt68ice_video_modes[i];
+    }
+
+    /* FPGA modes 6 and 7 fall back to 640x480 with one bitplane. */
+    return &rt68ice_video_modes[MODE_640X480_1BP];
+}
+
+static const struct rt68ice_video_mode *rt68ice_video_mode_from_videl(UWORD videl_mode)
+{
+    UWORD i;
+
+    videl_mode &= VIDEL_VALID;
+    for (i = 0; i < ARRAY_SIZE(rt68ice_video_modes); i++) {
+        if (rt68ice_video_modes[i].videl_mode == videl_mode)
+            return &rt68ice_video_modes[i];
+    }
+
+    return NULL;
+}
+
+static ULONG rt68ice_palette_to_rgb(UWORD color)
+{
+    ULONG red = (color >> 8) & 0x07;
+    ULONG green = (color >> 4) & 0x07;
+    ULONG blue = color & 0x07;
+
+    /* Expand the ST's 3-bit components to FPGA 0x00RRGGBB. */
+    return ((red * 255UL / 7UL) << 16)
+         | ((green * 255UL / 7UL) << 8)
+         | (blue * 255UL / 7UL);
+}
+
+static void rt68ice_write_palette(WORD color_num)
+{
+    pword_vga_palette[color_num] = rt68ice_palette_to_rgb(rt68ice_palette[color_num]);
+}
+
+void rt68ice_setpalette(const UWORD *palette)
+{
+    WORD i;
+
+    for (i = 0; i < ARRAY_SIZE(rt68ice_palette); i++) {
+        rt68ice_palette[i] = palette[i] & 0x0777;
+        rt68ice_write_palette(i);
+    }
+}
+
+WORD rt68ice_setcolor(WORD color_num, WORD color)
+{
+    WORD old_color;
+
+    color_num &= 0x000f;
+    old_color = rt68ice_palette[color_num];
+    if (color >= 0) {
+        rt68ice_palette[color_num] = color & 0x0777;
+        rt68ice_write_palette(color_num);
+    }
+
+    return old_color;
+}
+
+static void rt68ice_set_default_palette(void)
+{
+    WORD i;
+
+    for (i = 0; i < ARRAY_SIZE(rt68ice_palette); i++)
+        rt68ice_write_palette(i);
+}
 
 /* 
  * Initialize graphic palette and video mode 
  */
 void rt68ice_screen_init(void)
 {
-    // Set palette colors (xxRRGGBB):
-    pword_vga_palette[0x0] = 0x00FFFFFF; // White
-    pword_vga_palette[0x1] = 0x00FF0000; // Red
-    pword_vga_palette[0x2] = 0x0000FF00; // Green
-    pword_vga_palette[0x3] = 0x00000000; // Black
-    pword_vga_palette[0x4] = 0x000000FF; // Blue
-    pword_vga_palette[0x5] = 0x00FFFF00; // Yellow
-    pword_vga_palette[0x6] = 0x00FF00FF; // Magenta    
-    pword_vga_palette[0x7] = 0x0000FFFF; // Cyan
-    pword_vga_palette[0x8] = 0x00808080; // Medium Gray
-    pword_vga_palette[0x9] = 0x00800000; // Dark Red
-    pword_vga_palette[0xa] = 0x00008000; // Dark Green
-    pword_vga_palette[0xb] = 0x00000080; // Dark Blue
-    pword_vga_palette[0xc] = 0x00808000; // Olive
-    pword_vga_palette[0xd] = 0x00800080; // Purple
-    pword_vga_palette[0xe] = 0x00008080; // Teal
-    pword_vga_palette[0xf] = 0x00404040; // Dark Gray
+    rt68ice_set_default_palette();
 
     /* Set VBL interrupt routine */
     VEC_LEVEL4 = rt68ice_vbl_int;
@@ -174,13 +264,13 @@ void rt68ice_screen_init(void)
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
 
     /* Set screen mode and enable vblank interrupt */
-    rt68ice_set_screen_mode(MODE_640X480_2BP);
-    //rt68ice_set_screen_mode(MODE_640X240_4BP);
+    rt68ice_set_screen_mode(MODE_640X480_1BP);
+    sshiftmod = ST_HIGH;
 }
 
 ULONG rt68ice_vram_size(void)
 {
-    return 70800UL;
+    return 75UL * 1024UL;
 }
 
 /*
@@ -188,45 +278,22 @@ ULONG rt68ice_vram_size(void)
  */
 WORD rt68ice_get_palette(void)
 {
-    return 4096;
+    return 1 << rt68ice_video_mode_from_hardware(current_screen_mode)->planes;
 }
 
 WORD rt68ice_vgetmode(void)
 {
-    return current_screen_mode;
+    return rt68ice_video_mode_from_hardware(current_screen_mode)->videl_mode;
 }
 
 void rt68ice_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
 {
-    switch (current_screen_mode)
-    {
-        /* TODO: MODE_320X240_8BP resolution doesn't work 
-                 the problem might be the number of planes,
-                 I tried to set it to 4 and it wasn't stuck.
-                 (Screen wasn't shown properly because the
-                 RT68ICE low res uses 8 planes)
-        */
-        case MODE_320X240_8BP:
-            *hz_rez = 320;
-            *vt_rez = 240;
-            *planes = 8; /* TODO: 8 planes doesn't work*/
-            break;
+    const struct rt68ice_video_mode *mode;
 
-        case MODE_640X240_4BP:
-            *hz_rez = 640;
-            *vt_rez = 240;
-            *planes = 4;
-            break;
-
-        case MODE_640X480_2BP:
-            *hz_rez = 640;
-            *vt_rez = 480;
-            *planes = 2;
-            break;
-
-        default:
-            break;
-    }    
+    mode = rt68ice_video_mode_from_hardware(current_screen_mode);
+    *hz_rez = mode->width;
+    *vt_rez = mode->height;
+    *planes = mode->planes;
 }
 
 void rt68ice_setphys(const UBYTE *addr)
@@ -241,41 +308,60 @@ const UBYTE *rt68ice_physbase(void)
 
 void rt68ice_set_screen_mode(UBYTE screen_mode) 
 {
+    if (screen_mode > MODE_640X480_2BP)
+        screen_mode = MODE_640X480_1BP;
+
     VIDEO_CTRL = screen_mode;
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
     current_screen_mode = screen_mode;
+
+    /* ST high resolution is monochrome: white paper, black ink. */
+    if (screen_mode == MODE_640X480_1BP) {
+        rt68ice_palette[0] = 0x0fff;
+        rt68ice_palette[1] = 0x0000;
+        rt68ice_write_palette(0);
+        rt68ice_write_palette(1);
+    }
 }
 
 WORD rt68ice_check_moderez(WORD moderez)
 {
-    return (moderez == current_screen_mode)?0:moderez;
+    const struct rt68ice_video_mode *mode;
+    WORD rez;
+
+    if (moderez < 0) {
+        rez = moderez & 0x00ff;
+        if (rez < ST_LOW || rez > ST_HIGH)
+            return 0;
+        mode = &rt68ice_video_modes[rez];
+    } else {
+        mode = rt68ice_video_mode_from_videl((UWORD)moderez);
+        if (!mode)
+            return 0;
+    }
+
+    return (mode->hardware_mode == current_screen_mode) ? 0 : moderez;
 }
 
-/*
-    Used by setscreen function (screen.c).
-    It uses ST resolutions screen modes (low and med) but for 
-    640x400 and 640x480, this may confuse  some applications. 
-    A better approach could be the amiga one with VIDEL.
-*/
+/* Used by Setscreen().  The FPGA mode numbers are independent of the
+ * Atari XBIOS resolution indices. */
 void rt68ice_setrez(WORD rez, WORD videlmode)
 {
-    switch (rez)
-    {
-        case 0:
-            rt68ice_set_screen_mode(MODE_320X240_8BP);
-            break;
+    const struct rt68ice_video_mode *mode;
 
-        case 1:
-            rt68ice_set_screen_mode(MODE_640X240_4BP);
-            break;
-
-        case 2:
-            rt68ice_set_screen_mode(MODE_640X480_2BP);
-            break;
-
-        default:
-            break;
+    if (rez >= ST_LOW && rez <= ST_HIGH) {
+        mode = &rt68ice_video_modes[rez];
+        sshiftmod = rez;
+    } else if (rez == FALCON_REZ) {
+        mode = rt68ice_video_mode_from_videl((UWORD)videlmode);
+        if (!mode)
+            return;
+        sshiftmod = FALCON_REZ;
+    } else {
+        return;
     }
+
+    rt68ice_set_screen_mode(mode->hardware_mode);
 }
 
 /******************************************************************************/
