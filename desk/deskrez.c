@@ -18,6 +18,7 @@
 #include "emutos.h"
 #include "aesbind.h"
 #include "obdefs.h"
+#include "gsxdefs.h"
 #include "optimize.h"
 
 #include "deskbind.h"
@@ -353,8 +354,12 @@ int i, selected;
 
     tree = ADRT68RZ;
     if (!rt68ice_rez_tree_fixed) {
-        for (i = 0; i < ARRAY_SIZE(rt68ice_rez_tree); i++)
-            rsrc_obfix(tree, i);
+        for (i = 0; i < ARRAY_SIZE(rt68ice_rez_tree); i++) {
+            tree[i].ob_x *= gl_wchar;
+            tree[i].ob_y *= gl_hchar;
+            tree[i].ob_width *= gl_wchar;
+            tree[i].ob_height *= gl_hchar;
+        }
         rt68ice_rez_tree_fixed = TRUE;
     }
 
