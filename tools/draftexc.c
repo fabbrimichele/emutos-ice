@@ -113,7 +113,7 @@ char *exclude_items[] =
     "STREZ3",
     "STREZ4",
 #endif
-#if !defined(MACHINE_AMIGA)
+#if !defined(MACHINE_AMIGA) && !defined(MACHINE_RT68ICE)
     "ADAMIREZ",
 #endif
 

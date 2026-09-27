@@ -231,24 +231,6 @@ WORD mode, monitor;
 }
 #endif
 
-#ifdef MACHINE_RT68ICE
-/*
- *  change_st_rez(): change desktop rt68ice resolution
- *  returns:    0   user cancelled change
- *              1   user wants to change; newres is updated with new resolution.
- */
-static int change_rt68ice_rez(WORD *newres)
-{
-    /* Switch between the standard RT68ICE medium and high modes.
-     * rt68ice_vgetmode() returns a VIDEL-style mode descriptor, not the
-     * FPGA hardware mode number, so use Getrez() for this ST-style choice.
-     */
-    *newres = (Getrez() == ST_HIGH) ? ST_MEDIUM : ST_HIGH;
-
-    return 1;    
-}
-#endif
-
 #ifdef MACHINE_AMIGA
 /* This assumes that inside ADAMIREZ dialog, buttons are sorted
  * left to right then top to bottom. */
@@ -320,6 +302,83 @@ WORD oldmode;
 }
 #endif
 
+#ifdef MACHINE_RT68ICE
+/* ADAMIREZ is shared with the Amiga port.  Its first six selectable buttons
+ * are relabelled for the six modes implemented by the FPGA. */
+#define NUM_RT68ICE_DIALOG_CONTROLS  14
+#define RT68ICE_DIALOG_SEPARATOR_1    8
+#define RT68ICE_DIALOG_SEPARATOR_2   12
+
+static const WORD rt68ice_mode_from_button[] =
+{
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_4BPP,               /* 320x240x4 */
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_80COL|VIDEL_2BPP,   /* 640x240x2 */
+    VIDEL_VGA|VIDEL_80COL|VIDEL_1BPP,                  /* 640x480x1 */
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_8BPP,               /* 320x240x8 */
+    VIDEL_VGA|VIDEL_VERTICAL|VIDEL_80COL|VIDEL_4BPP,   /* 640x240x4 */
+    VIDEL_VGA|VIDEL_80COL|VIDEL_2BPP                   /* 640x480x2 */
+};
+
+static const char * const rt68ice_mode_name[] =
+{
+    "320/4p",
+    "640/2p",
+    "640/1p",
+    "320/8p",
+    "640/4p",
+    "640/2p"
+};
+
+static int change_rt68ice_rez(WORD *newres,WORD *newmode)
+{
+OBJECT *tree, *obj;
+WORD oldmode;
+int i, selected;
+
+    oldmode = rt68ice_vgetmode();
+    selected = -1;
+    for (i = 0; i < ARRAY_SIZE(rt68ice_mode_from_button); i++) {
+        if (oldmode == rt68ice_mode_from_button[i]) {
+            selected = i;
+            break;
+        }
+    }
+
+    tree = desk_rs_trees[ADAMIREZ];
+    tree[2].ob_spec = (LONG)"Format: width/planes";
+    tree[3].ob_spec = (LONG)"RT68ICE";
+
+    for (i = 0, obj = tree+AMIREZ0; i < NUM_RT68ICE_DIALOG_CONTROLS; i++, obj++) {
+        if (i < ARRAY_SIZE(rt68ice_mode_from_button)) {
+            obj->ob_spec = (LONG)rt68ice_mode_name[i];
+            obj->ob_state &= ~DISABLED;
+            if (i == selected)
+                obj->ob_state |= SELECTED;
+            else
+                obj->ob_state &= ~SELECTED;
+        } else if ((i != RT68ICE_DIALOG_SEPARATOR_1)
+                   && (i != RT68ICE_DIALOG_SEPARATOR_2)) {
+            obj->ob_state |= DISABLED;
+            obj->ob_state &= ~SELECTED;
+        }
+    }
+    tree[AMIREZ0+RT68ICE_DIALOG_SEPARATOR_1].ob_spec = (LONG)"";
+    tree[AMIREZ0+RT68ICE_DIALOG_SEPARATOR_2].ob_spec = (LONG)"";
+
+    inf_show(tree,ROOT);
+    if (inf_what(tree,AMREZOK) == 0)
+        return 0;
+
+    i = inf_gindex(tree,AMIREZ0,NUM_RT68ICE_DIALOG_CONTROLS);
+    if ((i < 0) || (i >= ARRAY_SIZE(rt68ice_mode_from_button)) || (i == selected))
+        return 0;
+
+    *newres = FALCON_REZ;
+    *newmode = rt68ice_mode_from_button[i];
+    return 1;
+}
+#endif
+
 /*
  *  change_resolution(): change desktop resolution
  *
@@ -338,7 +397,7 @@ int change_resolution(WORD *newres,WORD *newmode)
 #endif
 
 #ifdef MACHINE_RT68ICE
-    return change_rt68ice_rez(newres);
+    return change_rt68ice_rez(newres,newmode);
 #endif
 
 #if CONF_WITH_VIDEL
