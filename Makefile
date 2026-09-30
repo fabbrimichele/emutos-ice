@@ -641,7 +641,7 @@ TOCLEAN += *.img
 
 IMG_RT68ICE = emutos-rt68ice.img
 RT68ICE_DEFS =
-LOAD_ADDRESS := 00780000 # 8MB - 512KB ( = EmuTOS dedicated space)
+LOAD_ADDRESS := 00D80000 # 14MB - 512KB ( = EmuTOS dedicated space)
 
 .PHONY: rt68ice
 NODEP += rt68ice
