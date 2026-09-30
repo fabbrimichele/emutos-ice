@@ -15,7 +15,9 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
   ST-compatible palette handling (including white background/black foreground
   in 640x480 monochrome mode).
 - USB keyboard and mouse.
-- 8 MiB SDRAM.
+- 14 MiB SDRAM.  EmuTOS is loaded at `0x00d80000`, reserving its upper
+  512 KiB image and leaving 13.5 MiB available to the system; video memory
+  begins at `0x00e00000`.
 - Serial console at 57600 baud.
 - SD card storage using SPI mode (one data bit).
 - 200 Hz system timer.
@@ -26,8 +28,6 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 - Improve the video driver and add standard ST-compatible modes: 640x400 with
   1 bitplane, 640x200 with 2 bitplanes, and 320x200 with 4 bitplanes.
 - Gamepad/joystick driver for EmuTOS.
-- Increase RAM to the practical 68000 address-space limit.  A 68000 has a
-  24-bit address bus, so 16 MiB includes RAM, video, ROM, and I/O mappings.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
 - Use FPGA RAM as an SDRAM cache.
 - Add four-bit SD-card mode.
@@ -39,10 +39,9 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 ## Suggested implementation order
 
 1. Add the standard ST video modes.
-2. Expand RAM within the 68000 address space.
-3. Add the SPI-ROM boot path.
-4. Add gamepad/joystick support.
-5. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
+2. Add the SPI-ROM boot path.
+3. Add gamepad/joystick support.
+4. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
    cache-coherency behaviour.
-6. Add four-bit SD-card mode.
-7. Move to a 68020 and extend the memory map for 32 MiB.
+5. Add four-bit SD-card mode.
+6. Move to a 68020 and extend the memory map for 32 MiB.
