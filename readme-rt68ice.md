@@ -24,6 +24,10 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 
 ## Remaining work
 
+- Add a CRC-32 to the EmuTOS boot image and make the monitor validate the
+  header, load bounds, and CRC after copying the payload to SDRAM before it
+  jumps to EmuTOS.  This is the highest-priority reliability item, since it
+  detects corrupt serial/flash images and SDRAM copy errors.
 - Boot from serial flash ROM: FPGA SPI-ROM device and a boot-loader driver.
 - Improve the video driver and add standard ST-compatible modes: 640x400 with
   1 bitplane, 640x200 with 2 bitplanes, and 320x200 with 4 bitplanes.
@@ -38,10 +42,11 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 
 ## Suggested implementation order
 
-1. Add the standard ST video modes.
+1. Add CRC-32 validation to the boot image and monitor loader.
 2. Add the SPI-ROM boot path.
-3. Add gamepad/joystick support.
-4. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
+3. Add the standard ST video modes.
+4. Add gamepad/joystick support.
+5. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
    cache-coherency behaviour.
-5. Add four-bit SD-card mode.
-6. Move to a 68020 and extend the memory map for 32 MiB.
+6. Add four-bit SD-card mode.
+7. Move to a 68020 and extend the memory map for 32 MiB.
