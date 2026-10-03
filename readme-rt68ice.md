@@ -1,9 +1,34 @@
 # EmuTOS Porting to rt68ice
 
-## How to load an EmuTOS to RT68ICE
+## Building and loading EmuTOS
+
+Build the RT68ICE image with:
+
+```shell
+make rt68ice
+```
+
+This generates `emutos-rt68ice.img`.  Load it through the RT68ICE monitor
+with:
+
 ```shell
 python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-rt68ice.img
 ```
+
+The image is a big-endian monitor transfer image, not a raw `emutos.img`:
+
+| Offset | Size | Field |
+| --- | ---: | --- |
+| `0x00` | 4 bytes | ASCII magic `RT68` |
+| `0x04` | 4 bytes | Load address (`0x00d80000`) |
+| `0x08` | 4 bytes | Payload length |
+| `0x0c` | 4 bytes | CRC-32/ISO-HDLC of the payload |
+| `0x10` | variable | Raw EmuTOS payload |
+
+The monitor rejects an invalid magic value, calculates CRC-32/ISO-HDLC while
+receiving the payload, and reports a CRC error if the calculated value differs
+from the header.  `tools/make_rt68ice_image.py` creates this header as part of
+the `make rt68ice` rule.
 
 ## Current hardware support
 
@@ -24,10 +49,7 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 
 ## Remaining work
 
-- Add a CRC-32 to the EmuTOS boot image and make the monitor validate the
-  header, load bounds, and CRC after copying the payload to SDRAM before it
-  jumps to EmuTOS.  This is the highest-priority reliability item, since it
-  detects corrupt serial/flash images and SDRAM copy errors.
+- Add monitor load-range validation before copying the payload to SDRAM.
 - Boot from serial flash ROM: FPGA SPI-ROM device and a boot-loader driver.
 - Improve the video driver and add standard ST-compatible modes: 640x400 with
   1 bitplane, 640x200 with 2 bitplanes, and 320x200 with 4 bitplanes.
@@ -42,11 +64,10 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 
 ## Suggested implementation order
 
-1. Add CRC-32 validation to the boot image and monitor loader.
-2. Add the SPI-ROM boot path.
-3. Add the standard ST video modes.
-4. Add gamepad/joystick support.
-5. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
+1. Add the SPI-ROM boot path.
+2. Add the standard ST video modes.
+3. Add gamepad/joystick support.
+4. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
    cache-coherency behaviour.
-6. Add four-bit SD-card mode.
-7. Move to a 68020 and extend the memory map for 32 MiB.
+5. Add four-bit SD-card mode.
+6. Move to a 68020 and extend the memory map for 32 MiB.

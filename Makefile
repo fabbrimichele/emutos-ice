@@ -655,13 +655,10 @@ rt68ice:
 	$(MAKE) CPUFLAGS='$(CPUFLAGS)' DEF='$(DEF)' OPTFLAGS='$(OPTFLAGS)' UNIQUE=$(UNIQUE) IMG_RT68ICE=$(IMG_RT68ICE) $(IMG_RT68ICE) REF_OS=TOS206
 	@printf "$(LOCALCONFINFO)"
 
-# Creates the img file in the format expected by the rt68ice bootloader
-$(IMG_RT68ICE): emutos.img mkrom
-	SHELL_RAW_FILE="emutos.img"; \
-	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
-	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
-	HEADER_HEX="$(LOAD_ADDRESS)"$$HEX_SIZE; \
-	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $(IMG_RT68ICE)
+# Creates the image format expected by the rt68ice monitor:
+# magic, load address, payload length, CRC-32/ISO-HDLC, then payload.
+$(IMG_RT68ICE): emutos.img tools/make_rt68ice_image.py
+	python3 tools/make_rt68ice_image.py --address $(LOAD_ADDRESS) emutos.img $(IMG_RT68ICE)
 
 #
 # Amiga Image
