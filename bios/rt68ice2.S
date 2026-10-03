@@ -17,6 +17,12 @@ _rt68ice_usb_int:
 // Interrupt handler
         .globl  _rt68ice_timer_int
 _rt68ice_timer_int:
+        // AES timer callbacks switch to a small private tick stack beside
+        // the mouse stack. A level-6 USB interrupt here can overwrite its
+        // own saved registers when a mouse callback reuses that mouse stack.
+        // Defer USB until int_timerc returns with RTE, which restores the
+        // interrupted SR (including its original interrupt mask).
+        move.w  #0x2600,sr
         // TODO: use TIMER_STATUS
         tst.w   0x00f1c002              // Clear FPGA timer IRQ (if a read/test clears it without clobbering registers)
         move.l  _vector_5ms,-(sp)   
