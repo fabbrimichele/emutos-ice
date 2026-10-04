@@ -112,7 +112,14 @@ if the calculated value differs from the header.
   the FPGA receives 24-bit RGB palette values.  The lower-depth modes retain
   ST-compatible palette handling (including white background/black foreground
   in 640x480 monochrome mode).
-- USB keyboard and mouse.
+- USB keyboard on port 1 and mouse on port 2.
+- USB gamepads on ports 3 (Atari joystick 1) and 4 (Atari joystick 0).
+  Directions map to the Atari joystick direction bits; A, B, X and Y each
+  act as fire. Select and Start are ignored. The driver sends standard IKBD
+  joystick packets through `joyvec` when the state changes, and supports
+  event reporting (`0x14`), interrogation mode (`0x15`), interrogation
+  (`0x16`), and disabling joystick events (`0x1a`). Joystick monitoring and
+  keycode modes are not implemented. Both joysticks can coexist with the mouse.
 - 14 MiB SDRAM.  EmuTOS is loaded at `0x00d80000`, reserving its upper
   512 KiB image and leaving 13.5 MiB available to the system; video memory
   begins at `0x00e00000`.
@@ -122,13 +129,39 @@ if the calculated value differs from the header.
   (with the updated RT68ICE FPGA design and monitor).
 - 200 Hz system timer.
 
+## Testing joystick input
+
+The generic TOS joystick event diagnostic is maintained in the sibling
+`emutos-apps` repository, under `joytest`. Build it on the host:
+
+```sh
+make -C ../emutos-apps/joytest
+```
+
+Copy `../emutos-apps/joytest/joytest.prg` to the SD card and run it under
+EmuTOS. Alternatively, start a ZMODEM receiver on RT68ICE and run
+`make -C ../emutos-apps/joytest send-setting-port` on the host.
+Connect a gamepad
+to USB port 3 for joystick 1, or port 4 for joystick 0. The program displays
+both joystick states whenever they change. Test each direction and A/B/X/Y:
+up is `01`, down `02`, left `04`, right `08`, and fire `80`; combinations
+OR these bits together. Releasing all controls should return the state to
+`00`. Start and Select should have no effect. If two pads are connected,
+verify that moving one does not clear the other pad's held controls.
+Press any keyboard key to exit and restore the previous joystick callback.
+This tests the USB interrupt and IKBD event callback path; it does not test
+interrogation mode.
+
 ## Remaining work
 
+- Extend `rt68ice_ikbd_writeb()` to support mouse and keyboard IKBD commands.
+  It currently handles joystick reporting commands; USB mouse and keyboard
+  input is delivered directly by the interrupt handlers, without implementing
+  the corresponding IKBD commands.
 - Optional monitor autoboot countdown with cancellation and recovery fallback
   (deferred during active EmuTOS development).
 - Improve the video driver and add standard ST-compatible modes: 640x400 with
   1 bitplane, 640x200 with 2 bitplanes, and 320x200 with 4 bitplanes.
-- Gamepad/joystick driver for EmuTOS.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
 - Use FPGA RAM as an SDRAM cache.
 - Add four-bit SD-card mode.
@@ -140,8 +173,7 @@ if the calculated value differs from the header.
 ## Suggested implementation order
 
 1. Add the standard ST video modes.
-2. Add gamepad/joystick support.
-3. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
+2. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
    cache-coherency behaviour.
-4. Add four-bit SD-card mode.
-5. Move to a 68020 and extend the memory map for 32 MiB.
+3. Add four-bit SD-card mode.
+4. Move to a 68020 and extend the memory map for 32 MiB.

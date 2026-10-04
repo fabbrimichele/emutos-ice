@@ -39,6 +39,7 @@ void rt68ice_call_5ms(void);
 void rt68ice_usb_init(void);
 void rt68ice_usb_int(void);
 void rt68ice_usb_int_c(void);
+void rt68ice_ikbd_writeb(UBYTE b);
 
 #endif /* MACHINE_RT68ICE */
 #endif /* RT68ICE_H */

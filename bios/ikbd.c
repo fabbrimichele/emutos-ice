@@ -966,6 +966,8 @@ void ikbd_writeb(UBYTE b)
     coldfire_flexcan_ikbd_writeb(b);
 #elif defined(MACHINE_AMIGA)
     amiga_ikbd_writeb(b);
+#elif defined(MACHINE_RT68ICE)
+    rt68ice_ikbd_writeb(b);
 #endif
 }
 
