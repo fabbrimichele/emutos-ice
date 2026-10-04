@@ -567,7 +567,7 @@ _call_ikbdraw:
 
 #endif /* CONF_WITH_FLEXCAN || CONF_SERIAL_IKBD || defined(MACHINE_LISA) || defined(MACHINE_RT68ICE) */
 
-#ifdef MACHINE_AMIGA
+#if defined(MACHINE_AMIGA) || defined(MACHINE_RT68ICE)
 
 /******************************************************************************/
 /* Call joyvec from C                                                         */
@@ -592,4 +592,4 @@ _call_joyvec:
 #endif
         rts
 
-#endif /* MACHINE_AMIGA */
+#endif /* MACHINE_AMIGA || MACHINE_RT68ICE */

@@ -24,6 +24,7 @@
 
 static void rt68ice_usb_mouse_int(void);
 static void rt68ice_usb_key_int(void);
+static void rt68ice_usb_joystick_int(UBYTE joynum, UWORD status, UWORD gamepad);
 static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 
 /* Custom registers */
@@ -83,7 +84,7 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 #define USB1_MOUSE_BTN  *(volatile UWORD*)(0x00f18012)   // Bits 2-0: middle, right, left buttons.
 #define USB1_MOUSE_DX   *(volatile UWORD*)(0x00f18014)   // Signed 16-bit X accumulator.
 #define USB1_MOUSE_DY   *(volatile UWORD*)(0x00f18016)   // Signed 16-bit Y accumulator.
-#define USB1_GAMEPAD    *(volatile UWORD*)(0x00f18018)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB1_GAMEPAD    *(volatile UWORD*)(0x00f18018)   // Bits 9-0: L, R, U, D, A, B, X, Y, Select, Start.
 #define USB1_KEY_MODS   *(volatile UWORD*)(0x00f1801a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
 #define USB1_KEY1       *(volatile UWORD*)(0x00f1801c)   // First USB HID boot-keyboard usage ID; zero means no key.
 #define USB1_KEY2       *(volatile UWORD*)(0x00f1801e)   // Second USB HID boot-keyboard usage ID; zero means no key.
@@ -95,7 +96,7 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 #define USB2_MOUSE_BTN  *(volatile UWORD*)(0x00f18032)   // Bits 2-0: middle, right, left buttons.
 #define USB2_MOUSE_DX   *(volatile UWORD*)(0x00f18034)   // Signed 16-bit X accumulator.
 #define USB2_MOUSE_DY   *(volatile UWORD*)(0x00f18036)   // Signed 16-bit Y accumulator.
-#define USB2_GAMEPAD    *(volatile UWORD*)(0x00f18038)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB2_GAMEPAD    *(volatile UWORD*)(0x00f18038)   // Bits 9-0: L, R, U, D, A, B, X, Y, Select, Start.
 #define USB2_KEY_MODS   *(volatile UWORD*)(0x00f1803a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
 #define USB2_KEY1       *(volatile UWORD*)(0x00f1803c)   // First USB HID boot-keyboard usage ID; zero means no key.
 #define USB2_KEY2       *(volatile UWORD*)(0x00f1803e)   // Second USB HID boot-keyboard usage ID; zero means no key.
@@ -107,7 +108,7 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 #define USB3_MOUSE_BTN  *(volatile UWORD*)(0x00f18052)   // Bits 2-0: middle, right, left buttons.
 #define USB3_MOUSE_DX   *(volatile UWORD*)(0x00f18054)   // Signed 16-bit X accumulator.
 #define USB3_MOUSE_DY   *(volatile UWORD*)(0x00f18056)   // Signed 16-bit Y accumulator.
-#define USB3_GAMEPAD    *(volatile UWORD*)(0x00f18058)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB3_GAMEPAD    *(volatile UWORD*)(0x00f18058)   // Bits 9-0: L, R, U, D, A, B, X, Y, Select, Start.
 #define USB3_KEY_MODS   *(volatile UWORD*)(0x00f1805a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
 #define USB3_KEY1       *(volatile UWORD*)(0x00f1805c)   // First USB HID boot-keyboard usage ID; zero means no key.
 #define USB3_KEY2       *(volatile UWORD*)(0x00f1805e)   // Second USB HID boot-keyboard usage ID; zero means no key.
@@ -119,7 +120,7 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 #define USB4_MOUSE_BTN  *(volatile UWORD*)(0x00f18072)   // Bits 2-0: middle, right, left buttons.
 #define USB4_MOUSE_DX   *(volatile UWORD*)(0x00f18074)   // Signed 16-bit X accumulator.
 #define USB4_MOUSE_DY   *(volatile UWORD*)(0x00f18076)   // Signed 16-bit Y accumulator.
-#define USB4_GAMEPAD    *(volatile UWORD*)(0x00f18078)   // Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+#define USB4_GAMEPAD    *(volatile UWORD*)(0x00f18078)   // Bits 9-0: L, R, U, D, A, B, X, Y, Select, Start.
 #define USB4_KEY_MODS   *(volatile UWORD*)(0x00f1807a)   // USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
 #define USB4_KEY1       *(volatile UWORD*)(0x00f1807c)   // First USB HID boot-keyboard usage ID; zero means no key.
 #define USB4_KEY2       *(volatile UWORD*)(0x00f1807e)   // Second USB HID boot-keyboard usage ID; zero means no key.
@@ -129,6 +130,15 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 #define USB_DEV_TYPE        0x0003
 #define USB_DEV_TYPE_KEY    0x1
 #define USB_DEV_TYPE_MOUSE  0x2
+#define USB_DEV_TYPE_PAD    0x3
+#define USB_DEV_ERROR       0x0080
+
+/* UsbDevice.scala concatenates L, R, U, D, A, B, X, Y, Select, Start. */
+#define USB_PAD_LEFT        0x0200
+#define USB_PAD_RIGHT       0x0100
+#define USB_PAD_UP          0x0080
+#define USB_PAD_DOWN        0x0040
+#define USB_PAD_FIRE        0x003c  /* A, B, X or Y */
 
 
 /* Initialize Native Features */
@@ -481,6 +491,12 @@ static UBYTE usb_mouse_buf_index;
 static BOOL  usb_keyb_is_break;
 static UBYTE usb_last_key_mods;
 static UBYTE usb_last_keys[4];
+static UBYTE usb_joy_state[2];
+static UBYTE usb_joy_reported[2];
+static BOOL usb_joy_events_disabled;
+static UBYTE usb_ikbd_command;
+static UBYTE usb_ikbd_remaining;
+static UWORD usb_ikbd_load;
 //static BOOL  usb_keyb_is_ext;
 
 void rt68ice_usb_init(void)
@@ -491,23 +507,33 @@ void rt68ice_usb_init(void)
     usb_last_key_mods = 0;
     usb_last_keys[0] = usb_last_keys[1] = 0;
     usb_last_keys[2] = usb_last_keys[3] = 0;
+    usb_joy_state[0] = usb_joy_state[1] = 0;
+    usb_joy_reported[0] = usb_joy_reported[1] = 0;
+    usb_joy_events_disabled = FALSE;
+    usb_ikbd_command = usb_ikbd_remaining = 0;
+    usb_ikbd_load = 0;
 
     USB_IRQ_ENABLE = 0;             /* important on warm reset */
+    (void)USB1_STATUS;
     (void)USB2_STATUS;              /* discard/ack any pending Host 2 report */
+    (void)USB3_STATUS;
+    (void)USB4_STATUS;
 
     /* Safe until init_acia_vecs() runs, without it mousevec is BSS and 
     therefore zero. call_mousevec() loads that zero callback and executes 
     jsr (a1) (bios/aciavecs.S:540), jumping into address 0. */
     kbdvecs.mousevec = just_rts;
+    kbdvecs.joyvec = just_rts;
     
     VEC_LEVEL6 = rt68ice_usb_int;   /* Set interrupt handlers */
-    USB_IRQ_ENABLE = 0x0003;        /* Enable USB1 and USB2 interrupts */
+    USB_IRQ_ENABLE = 0x000f;        /* Enable all four USB hosts */
 }
 
 /********************************************************************/
 /* Requires                                                         */
 /* - Keyboard on USB port 1                                         */
 /* - Mouse on USB port 2                                            */
+/* - Joystick 1 on USB port 3, joystick 0 on USB port 4               */
 /* TODO: I could make it more generic and allow mouse on any port   */
 /********************************************************************/
 void rt68ice_usb_int_c(void)
@@ -530,9 +556,125 @@ void rt68ice_usb_int_c(void)
             rt68ice_usb_mouse_int();
     }
 
-    // TODO: handle the other USB interrupts
-    (void)USB3_STATUS;
-    (void)USB4_STATUS;
+    if (irq_status & 0x0004)
+    {
+        UWORD status = USB3_STATUS;     /* acknowledge host 3 */
+
+        rt68ice_usb_joystick_int(1, status, USB3_GAMEPAD);
+    }
+
+    if (irq_status & 0x0008)
+    {
+        UWORD status = USB4_STATUS;     /* acknowledge host 4 */
+
+        rt68ice_usb_joystick_int(0, status, USB4_GAMEPAD);
+    }
+}
+
+static UBYTE rt68ice_usb_joystick_state(UWORD status, UWORD gamepad)
+{
+    if ((status & (USB_DEV_ERROR | USB_DEV_TYPE)) != USB_DEV_TYPE_PAD)
+        return 0;
+
+    return ((gamepad & USB_PAD_UP)    ? 0x01 : 0)
+         | ((gamepad & USB_PAD_DOWN)  ? 0x02 : 0)
+         | ((gamepad & USB_PAD_LEFT)  ? 0x04 : 0)
+         | ((gamepad & USB_PAD_RIGHT) ? 0x08 : 0)
+         | ((gamepad & USB_PAD_FIRE)  ? 0x80 : 0);
+}
+
+static void rt68ice_usb_joystick_int(UBYTE joynum, UWORD status, UWORD gamepad)
+{
+    UBYTE packet[3];
+    UBYTE state = rt68ice_usb_joystick_state(status, gamepad);
+
+    usb_joy_state[joynum] = state;
+    if (usb_joy_events_disabled || state == usb_joy_reported[joynum])
+        return;
+
+    /* Event callbacks receive the header and both joystick states. */
+    packet[0] = 0xfe + joynum;
+    packet[1] = usb_joy_state[0];
+    packet[2] = usb_joy_state[1];
+    usb_joy_reported[joynum] = state;
+    call_joyvec(packet);
+}
+
+/* Consume whole IKBD commands so parameter bytes cannot change joystick mode. */
+void rt68ice_ikbd_writeb(UBYTE b)
+{
+    UBYTE packet[3];
+    WORD old_sr;
+
+    if (usb_ikbd_load)
+    {
+        usb_ikbd_load--;
+        return;
+    }
+
+    if (usb_ikbd_remaining)
+    {
+        usb_ikbd_remaining--;
+        if (usb_ikbd_remaining)
+            return;
+        if (usb_ikbd_command == 0x20) /* MEMORY LOAD: skip payload */
+            usb_ikbd_load = b;
+        if (usb_ikbd_command != 0x80 || b != 0x01)
+            return;
+    }
+    else
+    {
+        usb_ikbd_command = b;
+        switch (b)
+        {
+        case 0x80: case 0x07: case 0x17:
+            usb_ikbd_remaining = 1;
+            return;
+        case 0x0a: case 0x0b: case 0x0c: case 0x21: case 0x22:
+            usb_ikbd_remaining = 2;
+            return;
+        case 0x20:
+            usb_ikbd_remaining = 3;
+            return;
+        case 0x09:
+            usb_ikbd_remaining = 4;
+            return;
+        case 0x0e:
+            usb_ikbd_remaining = 5;
+            return;
+        case 0x19: case 0x1b:
+            usb_ikbd_remaining = 6;
+            return;
+        }
+    }
+
+    /* A USB interrupt must not modify a packet while joyvec consumes it. */
+    old_sr = set_sr(0x2700);
+    switch (usb_ikbd_command)
+    {
+    case 0x80: /* RESET */
+        usb_joy_reported[0] = usb_joy_reported[1] = 0;
+        usb_joy_events_disabled = FALSE;
+        break;
+    case 0x14: /* SET JOYSTICK EVENT REPORTING */
+        usb_joy_events_disabled = FALSE;
+        break;
+    case 0x15: /* SET JOYSTICK INTERROGATION MODE */
+    case 0x1a: /* DISABLE JOYSTICKS */
+        usb_joy_events_disabled = TRUE;
+        break;
+    case 0x16: /* JOYSTICK INTERROGATE */
+        /* Read current hardware state even if no report IRQ was received. */
+        usb_joy_state[1] = rt68ice_usb_joystick_state(USB3_STATUS, USB3_GAMEPAD);
+        usb_joy_state[0] = rt68ice_usb_joystick_state(USB4_STATUS, USB4_GAMEPAD);
+        packet[0] = 0xfd;
+        packet[1] = usb_joy_state[0];
+        packet[2] = usb_joy_state[1];
+        /* Interrogation callbacks receive only the two state bytes. */
+        call_joyvec(packet + 1);
+        break;
+    }
+    set_sr(old_sr);
 }
 
 static void rt68ice_usb_mouse_int(void) {

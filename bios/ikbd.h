@@ -125,7 +125,7 @@ void push_ascii_ikbdiorec(UBYTE ascii);
 
 /* the following is in aciavecs.S */
 void call_mousevec(SBYTE *packet);
-#ifdef MACHINE_AMIGA
+#if defined(MACHINE_AMIGA) || defined(MACHINE_RT68ICE)
 void call_joyvec(UBYTE *packet);
 #endif
 #if CONF_WITH_FLEXCAN || CONF_SERIAL_IKBD || defined(MACHINE_LISA) || defined(MACHINE_RT68ICE)
