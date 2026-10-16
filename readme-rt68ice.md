@@ -14,7 +14,8 @@ serial loading and flash programming.
 
 ### Serial loading
 
-Load it through the RT68ICE monitor with:
+With the autoboot monitor, press any key in the serial terminal during the
+approximately 10-second startup window to enter the monitor. Then load it with:
 
 ```shell
 python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-rt68ice.img
@@ -30,7 +31,8 @@ for `Done.` before entering `run 00D80000`.
 The RT68ICE `spi_flash_port` branch provides a two-port SPI controller:
 port 0 remains the SD card and port 1 accesses the onboard 32 MiB W25Q256JV
 flash through the ECP5 `USRMCLK` primitive. Its updated monitor supports
-`loadflash` and `boot`.
+`loadflash` and `boot`. The RT68ICE `tos_autoboot` branch adds automatic
+boot after an approximately 10-second serial cancellation window.
 
 After building EmuTOS here, close the serial terminal and run these commands
 from the sibling **rt68ice repository**, with its updated bitstream built:
@@ -58,6 +60,19 @@ it does not modify flash and is not persistent across power cycles. To persist
 the updated FPGA design, the separate `make prog-flash` target programs the
 **FPGA bitstream**, not EmuTOS.
 
+With the autoboot monitor, reset prints the title followed by:
+
+```text
+Press any key on serial to start monitor (10 seconds)...
+```
+
+Press any key on the **serial terminal** during this window to cancel autoboot
+and enter the monitor. The triggering character is consumed, leaving the
+command prompt ready for input. Without serial input, the monitor automatically
+runs the same load-and-validate path as `boot`. USB keyboard input does not
+cancel the countdown. The delay uses a software polling loop calibrated for
+25 MHz, so its duration is approximate. The older monitor requires manual boot.
+
 At the monitor prompt:
 
 ```text
@@ -80,8 +95,9 @@ Missing/corrupt images, invalid ranges, busy flash or SPI timeouts return to
 the monitor without booting. A failed load may leave untrusted data in SDRAM;
 do not manually execute it.
 
-Autoboot is **not enabled**: resets enter the monitor, and booting remains an
-explicit command while EmuTOS is under active development.
+If automatic boot fails, the monitor reports the error and presents its command
+prompt without restarting the countdown. The 10-second window is the time to
+cancel autoboot; flash loading and validation take additional time.
 
 ### Image format and validation
 
@@ -125,8 +141,9 @@ if the calculated value differs from the header.
   begins at `0x00e00000`.
 - Serial console at 57600 baud.
 - SD card storage using SPI mode (one data bit).
-- Onboard SPI flash image loading and manual EmuTOS boot via the ROM monitor
-  (with the updated RT68ICE FPGA design and monitor).
+- Onboard SPI flash image loading and EmuTOS boot via the ROM monitor, including
+  automatic boot with an approximately 10-second serial cancellation window
+  (with the RT68ICE `tos_autoboot` FPGA design and monitor).
 - 200 Hz system timer.
 
 ## Testing joystick input
@@ -158,8 +175,6 @@ interrogation mode.
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
-- Optional monitor autoboot countdown with cancellation and recovery fallback
-  (deferred during active EmuTOS development).
 - Improve the video driver and add standard ST-compatible modes: 640x400 with
   1 bitplane, 640x200 with 2 bitplanes, and 320x200 with 4 bitplanes.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
