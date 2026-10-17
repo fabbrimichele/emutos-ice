@@ -14,7 +14,7 @@ serial loading and flash programming.
 
 ### Serial loading
 
-With the autoboot monitor, press any key in the serial terminal during the
+With the autoboot monitor, press **ESC** in the serial terminal during the
 approximately 10-second startup window to enter the monitor. Then load it with:
 
 ```shell
@@ -28,11 +28,11 @@ for `Done.` before entering `run 00D80000`.
 
 ### Flash programming and booting
 
-The RT68ICE `spi_flash_port` branch provides a two-port SPI controller:
+The current RT68ICE `main` branch provides a two-port SPI controller:
 port 0 remains the SD card and port 1 accesses the onboard 32 MiB W25Q256JV
 flash through the ECP5 `USRMCLK` primitive. Its updated monitor supports
-`loadflash` and `boot`. The RT68ICE `tos_autoboot` branch adds automatic
-boot after an approximately 10-second serial cancellation window.
+`loadflash` and `boot`, and automatically boots after an approximately
+10-second window during which ESC on the serial terminal cancels autoboot.
 
 After building EmuTOS here, close the serial terminal and run these commands
 from the sibling **rt68ice repository**, with its updated bitstream built:
@@ -63,13 +63,15 @@ the updated FPGA design, the separate `make prog-flash` target programs the
 With the autoboot monitor, reset prints the title followed by:
 
 ```text
-Press any key on serial to start monitor (10 seconds)...
+Press ESC on serial to start monitor (10 seconds)...
 ```
 
-Press any key on the **serial terminal** during this window to cancel autoboot
-and enter the monitor. The triggering character is consumed, leaving the
-command prompt ready for input. Without serial input, the monitor automatically
-runs the same load-and-validate path as `boot`. USB keyboard input does not
+Press **ESC** (ASCII 27, `0x1b`) on the **serial terminal** during this window
+to cancel autoboot and enter the monitor. The ESC character is consumed, leaving
+the command prompt ready for input. Other received bytes are discarded without
+restarting the countdown, so incidental serial input does not cancel autoboot.
+If no ESC is received, the monitor automatically runs the same load-and-validate
+path as `boot`. USB keyboard input does not
 cancel the countdown. The delay uses a software polling loop calibrated for
 25 MHz, so its duration is approximate. The older monitor requires manual boot.
 
@@ -97,7 +99,9 @@ do not manually execute it.
 
 If automatic boot fails, the monitor reports the error and presents its command
 prompt without restarting the countdown. The 10-second window is the time to
-cancel autoboot; flash loading and validation take additional time.
+cancel autoboot; flash loading and validation take additional time. The RGB LED
+stays off during normal monitor and boot operation and turns red on image load
+or boot errors.
 
 ### Image format and validation
 
@@ -143,7 +147,7 @@ if the calculated value differs from the header.
 - SD card storage using SPI mode (one data bit).
 - Onboard SPI flash image loading and EmuTOS boot via the ROM monitor, including
   automatic boot with an approximately 10-second serial cancellation window
-  (with the RT68ICE `tos_autoboot` FPGA design and monitor).
+  (with the current RT68ICE `main` FPGA design and monitor; press ESC to cancel).
 - 200 Hz system timer.
 
 ## Testing joystick input
