@@ -13,6 +13,15 @@
 #ifndef PSG_H
 #define PSG_H
 
+#ifdef MACHINE_RT68ICE
+/* RT68ICE uses word accesses, with register values in the low byte. */
+struct psg {
+  UWORD control;
+  UWORD data;
+};
+
+#define PSG ((volatile struct psg *) 0x00f24000)
+#else
 struct psg {
   UBYTE control;
   UBYTE pad0;
@@ -20,6 +29,7 @@ struct psg {
 };
 
 #define PSG ((volatile struct psg *) 0xffff8800)
+#endif
 
 /* bits in PSG_MULTI register */
 
