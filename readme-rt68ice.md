@@ -152,6 +152,7 @@ if the calculated value differs from the header.
 - DS1302 real-time clock used by the BIOS date/time calls. RTC years 2000–2099
   map to the corresponding GEMDOS dates; set the clock with `Tsetdate`/`Tsettime`
   or the monitor utility described in the RT68ICE DS1302 documentation.
+- PSG-compatible audio.
 
 ## Testing joystick input
 
@@ -187,7 +188,6 @@ interrogation mode.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
 - Use FPGA RAM as an SDRAM cache.
 - Add four-bit SD-card mode.
-- PSG-compatible audio.
 - Boot and recovery behaviour for absent or corrupt SD media.
 - SDRAM memory tests and SD-card read/write stress tests.
 
