@@ -111,7 +111,11 @@ extern int has_nvram;     /* in nvram.c */
 #endif
 
 /* convenience macro: TRUE iff any kind of real time clock */
+#ifdef MACHINE_RT68ICE
+#define HAS_RTC 1
+#else
 #define HAS_RTC (HAS_NVRAM || HAS_MEGARTC || HAS_ICDRTC || HAS_MONSTER_RTC || HAS_ULTRASATAN_CLOCK)
+#endif
 
 #if CONF_WITH_BLITTER
 extern int has_blitter;

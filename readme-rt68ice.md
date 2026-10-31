@@ -149,6 +149,9 @@ if the calculated value differs from the header.
   automatic boot with an approximately 10-second serial cancellation window
   (with the current RT68ICE `main` FPGA design and monitor; press ESC to cancel).
 - 200 Hz system timer.
+- DS1302 real-time clock used by the BIOS date/time calls. RTC years 2000–2099
+  map to the corresponding GEMDOS dates; set the clock with `Tsetdate`/`Tsettime`
+  or the monitor utility described in the RT68ICE DS1302 documentation.
 
 ## Testing joystick input
 
@@ -185,7 +188,6 @@ interrogation mode.
 - Use FPGA RAM as an SDRAM cache.
 - Add four-bit SD-card mode.
 - PSG-compatible audio.
-- RTC / persistent clock.
 - Boot and recovery behaviour for absent or corrupt SD media.
 - SDRAM memory tests and SD-card read/write stress tests.
 

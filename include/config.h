@@ -606,6 +606,9 @@
 # ifndef CONF_WITH_YM2149
 #  define CONF_WITH_YM2149 1
 # endif
+# ifndef CONF_WITH_MEGARTC
+#  define CONF_WITH_MEGARTC 0
+# endif
 
 /* The ones below are not needed in normale scenarios */
 /*

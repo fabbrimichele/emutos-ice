@@ -48,7 +48,7 @@ static UWORD bcd2int(UBYTE a)
 }
 #endif
 
-#if (CONF_WITH_ICDRTC || CONF_WITH_MONSTER || CONF_WITH_MEGARTC || CONF_WITH_NVRAM || CONF_WITH_IKBD_CLOCK || CONF_WITH_ULTRASATAN_CLOCK)
+#if (CONF_WITH_ICDRTC || CONF_WITH_MONSTER || CONF_WITH_MEGARTC || CONF_WITH_NVRAM || CONF_WITH_IKBD_CLOCK || CONF_WITH_ULTRASATAN_CLOCK || defined(MACHINE_RT68ICE))
 /*
  * structures used by extract_date(), extract_time()
  */
@@ -88,6 +88,137 @@ static void extract_time(struct hms *out, UWORD time)
     out->second = (time << 1) & 0x3f;
 }
 #endif
+
+#ifdef MACHINE_RT68ICE
+/* RT68ICE maps the DS1302 registers on even addresses in the upper byte. */
+#define RT68ICE_RTC_BASE       0x00f28000UL
+#define RT68ICE_RTC_SECONDS    0x00
+#define RT68ICE_RTC_MINUTES    0x02
+#define RT68ICE_RTC_HOURS      0x04
+#define RT68ICE_RTC_DAY        0x06
+#define RT68ICE_RTC_MONTH      0x08
+#define RT68ICE_RTC_WEEKDAY    0x0a
+#define RT68ICE_RTC_YEAR       0x0c
+#define RT68ICE_RTC_WP         0x0e
+#define RT68ICE_RTC_HALT       80      /* converted by FPGA to native CH=1 */
+#define RT68ICE_RTC_YEAR_BASE  20      /* RTC 00-99 represents 2000-2099 */
+
+static UBYTE rt68ice_rtc_read(ULONG offset)
+{
+    return *(volatile UBYTE *)(RT68ICE_RTC_BASE + offset);
+}
+
+static void rt68ice_rtc_write(ULONG offset, UBYTE value)
+{
+    *(volatile UBYTE *)(RT68ICE_RTC_BASE + offset) = value;
+}
+
+static BOOL rt68ice_rtc_valid_date(UWORD year, UWORD month, UWORD day)
+{
+    static const UBYTE month_days[12] =
+        { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    UWORD max_day;
+
+    if (month < 1 || month > 12)
+        return FALSE;
+
+    max_day = month_days[month - 1];
+    if (month == 2 && year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))
+        max_day++;
+
+    return day >= 1 && day <= max_day;
+}
+
+/* The weekday register uses Monday=1, matching the monitor utilities. */
+static UBYTE rt68ice_rtc_weekday(UWORD year, UWORD month, UWORD day)
+{
+    ULONG days = 0;
+    UWORD current_year, current_month;
+
+    year += 1980;
+    for (current_year = 2000; current_year < year; current_year++)
+        days += (current_year % 4 == 0 &&
+                 (current_year % 100 != 0 || current_year % 400 == 0)) ? 366 : 365;
+
+    for (current_month = 1; current_month < month; current_month++)
+    {
+        static const UBYTE month_days[12] =
+            { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        days += month_days[current_month - 1];
+        if (current_month == 2 && year % 4 == 0 &&
+            (year % 100 != 0 || year % 400 == 0))
+            days++;
+    }
+
+    days += day - 1;
+    return (UBYTE)((days + 5) % 7 + 1); /* 1 Jan 2000 was Saturday (6). */
+}
+
+/* Translate the RTC's 2000-2099 year into GEMDOS's 1980-based year. */
+static LONG rt68ice_rtc_getdt(void)
+{
+    struct ymd date;
+    struct hms time;
+    UBYTE seconds_before, seconds_after;
+    WORD tries;
+
+    /* Retry across a seconds rollover so fields come from one instant. */
+    for (tries = 0; tries < 3; tries++)
+    {
+        seconds_before = rt68ice_rtc_read(RT68ICE_RTC_SECONDS);
+        time.minute = rt68ice_rtc_read(RT68ICE_RTC_MINUTES);
+        time.hour = rt68ice_rtc_read(RT68ICE_RTC_HOURS);
+        date.day = rt68ice_rtc_read(RT68ICE_RTC_DAY);
+        date.month = rt68ice_rtc_read(RT68ICE_RTC_MONTH);
+        date.year = rt68ice_rtc_read(RT68ICE_RTC_YEAR) + RT68ICE_RTC_YEAR_BASE;
+        seconds_after = rt68ice_rtc_read(RT68ICE_RTC_SECONDS);
+
+        if (seconds_before == seconds_after && seconds_after <= 59)
+        {
+            time.second = seconds_after;
+            if (time.minute <= 59 && time.hour <= 23 &&
+                rt68ice_rtc_valid_date(date.year + 1980, date.month, date.day))
+            {
+                return MAKE_ULONG(((date.year << 9) | (date.month << 5) | date.day),
+                                  ((time.hour << 11) | (time.minute << 5) | (time.second >> 1)));
+            }
+        }
+    }
+
+    return DEFAULT_DATETIME;
+}
+
+static void rt68ice_rtc_setdt(ULONG datetime)
+{
+    struct ymd date;
+    struct hms time;
+    UBYTE old_wp;
+
+    extract_date(&date, HIWORD(datetime));
+    extract_time(&time, LOWORD(datetime));
+
+    /* The RTC stores 00-99 for 2000-2099; GEMDOS years 20-119 map there. */
+    if (date.year < RT68ICE_RTC_YEAR_BASE || date.year > 119 ||
+        !rt68ice_rtc_valid_date(date.year + 1980, date.month, date.day) ||
+        time.hour > 23 || time.minute > 59 || time.second > 59)
+        return;
+
+    old_wp = rt68ice_rtc_read(RT68ICE_RTC_WP);
+    rt68ice_rtc_write(RT68ICE_RTC_WP, 0);
+    /* Clear CH through the FPGA's documented binary-to-BCD conversion. */
+    rt68ice_rtc_write(RT68ICE_RTC_SECONDS, RT68ICE_RTC_HALT);
+    rt68ice_rtc_write(RT68ICE_RTC_MINUTES, time.minute);
+    rt68ice_rtc_write(RT68ICE_RTC_HOURS, time.hour);
+    rt68ice_rtc_write(RT68ICE_RTC_DAY, date.day);
+    rt68ice_rtc_write(RT68ICE_RTC_MONTH, date.month);
+    rt68ice_rtc_write(RT68ICE_RTC_WEEKDAY,
+                      rt68ice_rtc_weekday(date.year, date.month, date.day));
+    rt68ice_rtc_write(RT68ICE_RTC_YEAR, date.year - RT68ICE_RTC_YEAR_BASE);
+    /* Setting seconds last clears CH and starts the clock. */
+    rt68ice_rtc_write(RT68ICE_RTC_SECONDS, time.second);
+    rt68ice_rtc_write(RT68ICE_RTC_WP, old_wp);
+}
+#endif /* MACHINE_RT68ICE */
 
 #if CONF_WITH_ICDRTC
 
@@ -1151,6 +1282,12 @@ void clock_init(void)
     {
         /* Dummy case for conditional compilation */
     }
+#ifdef MACHINE_RT68ICE
+    else if (TRUE)
+    {
+        /* The DS1302 is fixed hardware; it needs no separate initialization. */
+    }
+#endif
 #ifdef MACHINE_AMIGA
     else if (TRUE)
     {
@@ -1225,6 +1362,12 @@ void settime(LONG time)
     {
         /* Dummy case for conditional compilation */
     }
+#ifdef MACHINE_RT68ICE
+    else if (TRUE)
+    {
+        rt68ice_rtc_setdt(time);
+    }
+#endif
 #if CONF_WITH_NVRAM
     else if (has_nvram)
     {
@@ -1269,6 +1412,12 @@ LONG gettime(void)
     {
         /* Dummy case for conditional compilation */
     }
+#ifdef MACHINE_RT68ICE
+    else if (TRUE)
+    {
+        return rt68ice_rtc_getdt();
+    }
+#endif
 #ifdef MACHINE_AMIGA
     else if (TRUE)
     {
