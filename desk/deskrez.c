@@ -306,21 +306,24 @@ WORD oldmode;
 #ifdef MACHINE_RT68ICE
 #define ADRT68RZ        rt68ice_rez_tree
 #define RT68RZ_MODE0    3
-#define RT68RZ_OK       9
+#define RT68RZ_OK       12
 
 /* This is an RT68ICE-only resolution-selector resource tree. */
 static OBJECT rt68ice_rez_tree[] =
 {
-    { -1,  1, 10, G_BOX,    FL3DBAK,                          OUTLINED, (LONG)69888L,                 0,  0, 38, 14 },
+    { -1,  1, 13, G_BOX,    FL3DBAK,                          OUTLINED, (LONG)69888L,                 0,  0, 38, 14 },
     {  2, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"RT68ICE SCREEN MODE",  9,  1, 20,  1 },
     {  3, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"Resolution / bitplanes", 8,  3, 22,  1 },
-    {  4, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/4",             1,  5, 11,  1 },
-    {  5, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/2",            13,  5, 11,  1 },
-    {  6, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/1",            25,  5, 11,  1 },
-    {  7, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/8",             1,  7, 11,  1 },
-    {  8, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/4",            13,  7, 11,  1 },
-    {  9, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/2",            25,  7, 11,  1 },
-    { 10, -1, -1, G_BUTTON, SELECTABLE|DEFAULT|EXIT|FL3DBAK|FL3DIND,
+    {  4, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x200/4",             1,  5, 11,  1 },
+    {  5, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x200/2",            13,  5, 11,  1 },
+    {  6, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x400/1",            25,  5, 11,  1 },
+    {  7, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/4",             1,  7, 11,  1 },
+    {  8, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/2",            13,  7, 11,  1 },
+    {  9, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/1",            25,  7, 11,  1 },
+    { 10, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/8",             1,  9, 11,  1 },
+    { 11, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/4",            13,  9, 11,  1 },
+    { 12, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/2",            25,  9, 11,  1 },
+    { 13, -1, -1, G_BUTTON, SELECTABLE|DEFAULT|EXIT|FL3DBAK|FL3DIND,
                                                                NORMAL,   (LONG)"OK",                  8, 11,  9,  1 },
     {  0, -1, -1, G_BUTTON, SELECTABLE|EXIT|LASTOB|FL3DBAK|FL3DIND,
                                                                NORMAL,   (LONG)"Cancel",             21, 11,  9,  1 }
@@ -329,6 +332,9 @@ static BOOL rt68ice_rez_tree_fixed;
 
 static const WORD rt68ice_mode_from_button[] =
 {
+    VIDEL_COMPAT|VIDEL_VGA|VIDEL_VERTICAL|VIDEL_4BPP,             /* 320x200x4 */
+    VIDEL_COMPAT|VIDEL_VGA|VIDEL_VERTICAL|VIDEL_80COL|VIDEL_2BPP, /* 640x200x2 */
+    VIDEL_COMPAT|VIDEL_VGA|VIDEL_80COL|VIDEL_1BPP,                /* 640x400x1 */
     VIDEL_VGA|VIDEL_VERTICAL|VIDEL_4BPP,               /* 320x240x4 */
     VIDEL_VGA|VIDEL_VERTICAL|VIDEL_80COL|VIDEL_2BPP,   /* 640x240x2 */
     VIDEL_VGA|VIDEL_80COL|VIDEL_1BPP,                  /* 640x480x1 */
@@ -378,7 +384,7 @@ int i, selected;
     if ((i < 0) || (i >= ARRAY_SIZE(rt68ice_mode_from_button)) || (i == selected))
         return 0;
 
-    *newres = FALCON_REZ;
+    *newres = (i <= ST_HIGH) ? i : FALCON_REZ;
     *newmode = rt68ice_mode_from_button[i];
     return 1;
 }

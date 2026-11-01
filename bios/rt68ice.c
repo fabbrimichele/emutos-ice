@@ -67,12 +67,15 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE);
 
 #define VIDEO_IRQ_VBL       0001
 
-#define MODE_320X240_4BP   0x00
-#define MODE_640X240_2BP   0x01
-#define MODE_640X480_1BP   0x02
-#define MODE_320X240_8BP   0x03
-#define MODE_640X240_4BP   0x04
-#define MODE_640X480_2BP   0x05
+#define MODE_320X200_4BP   0x00
+#define MODE_640X200_2BP   0x01
+#define MODE_640X400_1BP   0x02
+#define MODE_320X240_4BP   0x03
+#define MODE_640X240_2BP   0x04
+#define MODE_640X480_1BP   0x05
+#define MODE_320X240_8BP   0x06
+#define MODE_640X240_4BP   0x07
+#define MODE_640X480_2BP   0x08
 
 /* USB */
 // Global interrupt registers
@@ -177,6 +180,9 @@ struct rt68ice_video_mode {
  * indices.  The remaining modes are available through their VIDEL-style
  * description, while the FPGA register itself remains hardware-specific. */
 static const struct rt68ice_video_mode rt68ice_video_modes[] = {
+    { MODE_320X200_4BP, VIDEL_COMPAT | VIDEL_VGA | VIDEL_VERTICAL | VIDEL_4BPP, 320, 200, 4 },
+    { MODE_640X200_2BP, VIDEL_COMPAT | VIDEL_VGA | VIDEL_VERTICAL | VIDEL_80COL | VIDEL_2BPP, 640, 200, 2 },
+    { MODE_640X400_1BP, VIDEL_COMPAT | VIDEL_VGA | VIDEL_80COL | VIDEL_1BPP, 640, 400, 1 },
     { MODE_320X240_4BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_4BPP, 320, 240, 4 },
     { MODE_640X240_2BP, VIDEL_VGA | VIDEL_VERTICAL | VIDEL_80COL | VIDEL_2BPP, 640, 240, 2 },
     { MODE_640X480_1BP, VIDEL_VGA | VIDEL_80COL | VIDEL_1BPP, 640, 480, 1 },
@@ -194,8 +200,8 @@ static const struct rt68ice_video_mode *rt68ice_video_mode_from_hardware(UBYTE h
             return &rt68ice_video_modes[i];
     }
 
-    /* FPGA modes 6 and 7 fall back to 640x480 with one bitplane. */
-    return &rt68ice_video_modes[MODE_640X480_1BP];
+    /* Use ST high resolution for an unrecognised hardware mode. */
+    return &rt68ice_video_modes[MODE_640X400_1BP];
 }
 
 static const struct rt68ice_video_mode *rt68ice_video_mode_from_videl(UWORD videl_mode)
@@ -313,7 +319,7 @@ void rt68ice_screen_init(void)
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;   // Disable VGA interrupts during setup
 
     /* Set screen mode and enable vblank interrupt */
-    rt68ice_set_screen_mode(MODE_640X480_1BP);
+    rt68ice_set_screen_mode(MODE_640X400_1BP);
     sshiftmod = ST_HIGH;
 }
 
@@ -358,14 +364,14 @@ const UBYTE *rt68ice_physbase(void)
 void rt68ice_set_screen_mode(UBYTE screen_mode) 
 {
     if (screen_mode > MODE_640X480_2BP)
-        screen_mode = MODE_640X480_1BP;
+        screen_mode = MODE_640X400_1BP;
 
     VIDEO_CTRL = screen_mode;
     VIDEO_IRQ_ENABLE = VIDEO_IRQ_VBL;
     current_screen_mode = screen_mode;
 
-    /* ST high resolution is monochrome: white paper, black ink. */
-    if (screen_mode == MODE_640X480_1BP) {
+    /* Monochrome modes use white paper and black ink. */
+    if (rt68ice_video_mode_from_hardware(screen_mode)->planes == 1) {
         rt68ice_write_st_palette(0, 0x0fff);
         rt68ice_write_st_palette(1, 0x0000);
     }
@@ -403,7 +409,7 @@ void rt68ice_setrez(WORD rez, WORD videlmode)
         mode = rt68ice_video_mode_from_videl((UWORD)videlmode);
         if (!mode)
             return;
-        sshiftmod = FALCON_REZ;
+        sshiftmod = (mode->videl_mode & VIDEL_COMPAT) ? mode->hardware_mode : FALCON_REZ;
     } else {
         return;
     }
