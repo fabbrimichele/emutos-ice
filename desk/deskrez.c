@@ -308,25 +308,26 @@ WORD oldmode;
 #define RT68RZ_MODE0    3
 #define RT68RZ_OK       12
 
-/* This is an RT68ICE-only resolution-selector resource tree. */
+/* RT68ICE resolution selector: horizontal units are characters,
+ * vertical units are half-character rows. */
 static OBJECT rt68ice_rez_tree[] =
 {
-    { -1,  1, 13, G_BOX,    FL3DBAK,                          OUTLINED, (LONG)69888L,                 0,  0, 38, 14 },
-    {  2, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"RT68ICE SCREEN MODE",  9,  1, 20,  1 },
-    {  3, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"Resolution / bitplanes", 8,  3, 22,  1 },
-    {  4, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x200/4",             1,  5, 11,  1 },
-    {  5, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x200/2",            13,  5, 11,  1 },
-    {  6, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x400/1",            25,  5, 11,  1 },
-    {  7, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/4",             1,  7, 11,  1 },
-    {  8, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/2",            13,  7, 11,  1 },
-    {  9, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/1",            25,  7, 11,  1 },
-    { 10, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/8",             1,  9, 11,  1 },
-    { 11, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/4",            13,  9, 11,  1 },
-    { 12, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/2",            25,  9, 11,  1 },
+    { -1,  1, 13, G_BOX,    FL3DBAK,                          OUTLINED, (LONG)69888L,                 0,  0, 38, 20 },
+    {  2, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"RT68ICE SCREEN MODE",  9,  1, 20,  2 },
+    {  3, -1, -1, G_STRING, NONE,                             NORMAL,   (LONG)"Resolution / bitplanes", 8,  4, 22,  2 },
+    {  4, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x200/4",             1,  7, 11,  2 },
+    {  5, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x200/2",            13,  7, 11,  2 },
+    {  6, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x400/1",            25,  7, 11,  2 },
+    {  7, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/4",             1, 10, 11,  2 },
+    {  8, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/2",            13, 10, 11,  2 },
+    {  9, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/1",            25, 10, 11,  2 },
+    { 10, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"320x240/8",             1, 13, 11,  2 },
+    { 11, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x240/4",            13, 13, 11,  2 },
+    { 12, -1, -1, G_BUTTON, SELECTABLE|RBUTTON|FL3DIND,       NORMAL,   (LONG)"640x480/2",            25, 13, 11,  2 },
     { 13, -1, -1, G_BUTTON, SELECTABLE|DEFAULT|EXIT|FL3DBAK|FL3DIND,
-                                                               NORMAL,   (LONG)"OK",                  8, 11,  9,  1 },
+                                                               NORMAL,   (LONG)"OK",                  8, 17,  9,  2 },
     {  0, -1, -1, G_BUTTON, SELECTABLE|EXIT|LASTOB|FL3DBAK|FL3DIND,
-                                                               NORMAL,   (LONG)"Cancel",             21, 11,  9,  1 }
+                                                               NORMAL,   (LONG)"Cancel",             21, 17,  9,  2 }
 };
 static BOOL rt68ice_rez_tree_fixed;
 
@@ -362,9 +363,9 @@ int i, selected;
     if (!rt68ice_rez_tree_fixed) {
         for (i = 0; i < ARRAY_SIZE(rt68ice_rez_tree); i++) {
             tree[i].ob_x *= gl_wchar;
-            tree[i].ob_y *= gl_hchar;
+            tree[i].ob_y = tree[i].ob_y * gl_hchar / 2;
             tree[i].ob_width *= gl_wchar;
-            tree[i].ob_height *= gl_hchar;
+            tree[i].ob_height = tree[i].ob_height * gl_hchar / 2;
         }
         rt68ice_rez_tree_fixed = TRUE;
     }
