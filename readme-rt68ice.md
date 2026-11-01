@@ -125,13 +125,29 @@ if the calculated value differs from the header.
 
 ## Current hardware support
 
-- Video modes: 320x240 with 4 or 8 bitplanes, 640x240 with 2 or 4
-  bitplanes, and 640x480 with 1 or 2 bitplanes.  The 4/2/1-bitplane modes
-  are selected through the standard ST Low/Medium/High resolution indices.
-  The 8-bitplane mode has full EmuTOS VDI support for 256 palette entries;
-  the FPGA receives 24-bit RGB palette values.  The lower-depth modes retain
-  ST-compatible palette handling (including white background/black foreground
-  in 640x480 monochrome mode).
+- Nine FPGA video modes, selectable from the desktop resolution dialog:
+
+  | Hardware ID | Resolution | Bitplanes | Colours |
+  | --- | --- | --- | --- |
+  | 0 | 320x200 | 4 | 16 |
+  | 1 | 640x200 | 2 | 4 |
+  | 2 | 640x400 | 1 | 2 |
+  | 3 | 320x240 | 4 | 16 |
+  | 4 | 640x240 | 2 | 4 |
+  | 5 | 640x480 | 1 | 2 |
+  | 6 | 320x240 | 8 | 256 |
+  | 7 | 640x240 | 4 | 16 |
+  | 8 | 640x480 | 2 | 4 |
+
+  Standard ST Low/Medium/High XBIOS resolution indices select hardware modes
+  0/1/2. The boot default is ST High (640x400 monochrome). VIDEL-style mode
+  descriptions distinguish the ST modes using `VIDEL_COMPAT`; the six extended
+  modes retain their existing descriptions. All modes use the framebuffer at
+  `0x00e00000`; the FPGA supplies the borders for the ST modes. The largest
+  modes still require 75 KiB of video RAM. The 8-bitplane mode has full EmuTOS
+  VDI support for 256 palette entries; the FPGA receives 24-bit RGB palette
+  values. Lower-depth modes retain ST-compatible palette handling, with white
+  background/black foreground in both monochrome modes.
 - USB keyboard on port 1 and mouse on port 2.
 - USB gamepads on ports 3 (Atari joystick 1) and 4 (Atari joystick 0).
   Directions map to the Atari joystick direction bits; A, B, X and Y each
@@ -183,8 +199,6 @@ interrogation mode.
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
-- Improve the video driver and add standard ST-compatible modes: 640x400 with
-  1 bitplane, 640x200 with 2 bitplanes, and 320x200 with 4 bitplanes.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
 - Use FPGA RAM as an SDRAM cache.
 - Add four-bit SD-card mode.
@@ -193,8 +207,7 @@ interrogation mode.
 
 ## Suggested implementation order
 
-1. Add the standard ST video modes.
-2. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
+1. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
    cache-coherency behaviour.
-3. Add four-bit SD-card mode.
-4. Move to a 68020 and extend the memory map for 32 MiB.
+2. Add four-bit SD-card mode.
+3. Move to a 68020 and extend the memory map for 32 MiB.
