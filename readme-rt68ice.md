@@ -1,5 +1,11 @@
 # EmuTOS Porting to rt68ice
 
+## Validation results
+
+See the [RT68ICE validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md)
+for on-board CoreMark and YAARTTT results, test configuration and coverage,
+and the unresolved Dhrystone timing and GEMBench compatibility issues.
+
 ## Building and loading EmuTOS
 
 Build the RT68ICE image with:
