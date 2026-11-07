@@ -199,21 +199,73 @@ Press any keyboard key to exit and restore the previous joystick callback.
 This tests the USB interrupt and IKBD event callback path; it does not test
 interrogation mode.
 
+## SD SPI payload transfers
+
+The RT68ICE driver uses the SPI core's existing 16-bit transfer mode for
+payload byte pairs. It accesses Data High and Data Low through the existing
+byte registers, requiring no FPGA change. Each 512-byte payload now uses 256
+START/completion sequences. Commands, tokens, response polling and CRC bytes
+remain in 8-bit mode. The driver preserves the clock divisor and restores
+8-bit mode before returning, including for odd-length and discarded payloads.
+Other targets retain their existing byte-transfer loops.
+
+Build with `make rt68ice`. Three 4 MiB speed passes completed on the board
+with all payloads verified. Aggregate throughput reached 206.3 KiB/s write
+and 225.5 KiB/s read, improving on the byte-mode baseline by 2.38x and 2.89x
+respectively. Full results are in the
+[validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#16-bit-spi-payload-transfers).
+Mixed-size integrity testing and reboot persistence checks remain pending.
+
+After loading the new EmuTOS image, use new filenames for integrity and speed
+checks (the test refuses existing files):
+
+```text
+FILETEST run C:\SDCHECK.DAT 1 3
+FILETEST speed C:\SPEED16.DAT 4 3
+```
+
+Compare against the recorded baseline of 86.7 KiB/s write and 78.0 KiB/s read
+using the same card and benchmark binary. After a successful complete run,
+reboot normally and run `FILETEST verify C:\SPEED16.DAT` to check persistence.
+
 ## Remaining work
 
+- Prioritize SD-card throughput: measure the time spent in GEMDOS, SD block
+  transfers and the SPI byte-transfer loop, then reduce the dominant overhead.
+  The driver now starts and polls each payload byte pair; profile the remaining
+  overhead and investigate an FPGA FIFO or sector buffer before changing the
+  SD bus width.
+- Continue SD-card file-integrity, sequential-throughput and reboot/readback
+  tests. Extend SDRAM tests with byte-lane and mixed-size access checks; see
+  the validation report for the existing CPU, RAM and partial SD results.
+- Boot and recovery behaviour for absent or corrupt SD media.
 - Extend `rt68ice_ikbd_writeb()` to support mouse and keyboard IKBD commands.
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
 - Use FPGA RAM as an SDRAM cache.
-- Add four-bit SD-card mode.
-- Boot and recovery behaviour for absent or corrupt SD media.
-- SDRAM memory tests and SD-card read/write stress tests.
+- Consider native four-bit SD-card mode after measuring the improvements
+  available from the existing SPI path.
 
 ## Suggested implementation order
 
-1. Add the SDRAM cache, keeping I/O regions uncached and defining reset and
-   cache-coherency behaviour.
-2. Add four-bit SD-card mode.
-3. Move to a 68020 and extend the memory map for 32 MiB.
+1. Use the recorded `filetest speed` results: three verified 4 MiB passes per
+   version, improving from 86.7/78.0 KiB/s write/read in byte mode to
+   206.3/225.5 KiB/s with 16-bit payloads. Verification is outside the timed
+   transfers. Record configuration and future comparisons in the
+   [validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#sd-card-sequential-throughput).
+2. Measure sector-transfer time separately from filesystem time. Check how much
+   time is spent starting and polling SPI transfers, rather than shifting
+   data on the wire, before choosing an optimization.
+3. Optimize the measured bottleneck. For the SPI path, investigate continuous
+   block transfers with a FIFO or sector buffer and efficient CPU buffer access,
+   reducing per-byte register operations and software polling. Preserve the
+   shared controller's SD/flash selection and verify monitor flash boot.
+4. Repeat the same sequential benchmark, mixed-size file-integrity tests and
+   normal-reboot readback checks after each change. Compare throughput as well
+   as correctness before expanding the design.
+5. Reassess native four-bit SD, an SDRAM cache, and a 68020/32 MiB memory-map
+   upgrade against the remaining measured limitations. These are later options;
+   improving SD performance is the immediate priority. Keep the existing video
+   architecture and 640x480 display target for this work.

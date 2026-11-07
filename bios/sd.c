@@ -601,6 +601,9 @@ UBYTE token;
     /*
      *  transfer data
      */
+#ifdef MACHINE_RT68ICE
+    spi_recv_block(buf,len);
+#else
     if (buf) {
         for (i = 0; i < len; i++)
             *buf++ = spi_recv_byte();
@@ -608,6 +611,7 @@ UBYTE token;
         for (i = 0; i < len; i++)
             spi_recv_byte();
     }
+#endif
 
     spi_recv_byte();        /* discard crc */
     spi_recv_byte();
@@ -623,7 +627,9 @@ UBYTE token;
  */
 static int sd_send_data(UBYTE *buf,UWORD len,UBYTE token)
 {
+#ifndef MACHINE_RT68ICE
 LONG i;
+#endif
 UBYTE rtoken;
 
     spi_send_byte(token);
@@ -631,8 +637,12 @@ UBYTE rtoken;
         spi_recv_byte();    /* skip a byte before testing for busy */
     } else {
         /* send the data */
+#ifdef MACHINE_RT68ICE
+        spi_send_block(buf,len);
+#else
         for (i = 0; i < len; i++)
             spi_send_byte(*buf++);
+#endif
         spi_send_byte(0xff);        /* send dummy crc */
         spi_send_byte(0xff);
 

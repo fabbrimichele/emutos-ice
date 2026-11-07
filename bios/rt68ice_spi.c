@@ -33,6 +33,9 @@
 // - clock divisor = 25 MHz / 2 = 12.5 MHz
 #define RT68ICE_SPI_SD_MODE       RT68ICE_SPI_CONF_TRSZ(0b01) | RT68ICE_SPI_CONF_CDIV(0b000)
 
+/* Last byte-mode configuration, including the selected clock divisor. */
+static UBYTE spi_byte_mode = RT68ICE_SPI_IDENT_MODE;
+
 // Commands
 #define RT68ICE_SPI_DEASSERT_CS   RT68ICE_SPI_CDST_SPIAD(0) | RT68ICE_SPI_CDST_IRQE(0) | RT68ICE_SPI_CDST_CS(0) | RT68ICE_SPI_CDST_START(0)
 #define RT68ICE_SPI_ASSERT_CS     RT68ICE_SPI_CDST_SPIAD(0) | RT68ICE_SPI_CDST_IRQE(0) | RT68ICE_SPI_CDST_CS(1) | RT68ICE_SPI_CDST_START(0)
@@ -42,7 +45,8 @@
 void spi_clock_ident(void)
 {
     KDEBUG(("rt68ice: spi_clock_ident, conf = 0x%02x\n", RT68ICE_SPI_IDENT_MODE));
-    RT68ICE_SPI_CONF = RT68ICE_SPI_IDENT_MODE;
+    spi_byte_mode = RT68ICE_SPI_IDENT_MODE;
+    RT68ICE_SPI_CONF = spi_byte_mode;
 }
 
 void spi_clock_mmc(void)
@@ -54,7 +58,8 @@ void spi_clock_mmc(void)
 void spi_clock_sd(void)
 {
     KDEBUG(("rt68ice: spi_clock_sd, conf = 0x%02x\n", RT68ICE_SPI_SD_MODE));
-    RT68ICE_SPI_CONF = RT68ICE_SPI_SD_MODE;
+    spi_byte_mode = RT68ICE_SPI_SD_MODE;
+    RT68ICE_SPI_CONF = spi_byte_mode;
 }
 
 void spi_cs_assert(void)
@@ -74,7 +79,8 @@ void spi_cs_unassert(void)
 void spi_initialise(void)
 {
     KDEBUG(("rt68ice: spi_initialise, conf = 0x%02x\n", RT68ICE_SPI_IDENT_MODE));
-    RT68ICE_SPI_CONF = RT68ICE_SPI_IDENT_MODE;
+    spi_byte_mode = RT68ICE_SPI_IDENT_MODE;
+    RT68ICE_SPI_CONF = spi_byte_mode;
 }
 
 UBYTE spi_recv_byte(void)
@@ -97,4 +103,67 @@ void spi_send_byte(UBYTE input)
     // 4. Wait for transfer to finish before returning 
     // (required to finish reading commands)
     while(RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY);
+}
+
+/*
+ * Payload-only helpers.  Commands, tokens and CRC bytes still use byte mode.
+ * The existing FPGA interface exposes the two data bytes at separate odd
+ * addresses; no CPU word access or buffer alignment is required here.
+ * In 16-bit mode DH is shifted first, followed by DL.
+ */
+void spi_recv_block(UBYTE *buf, UWORD len)
+{
+    if (len >= 2) {
+        while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+            ;
+        RT68ICE_SPI_CONF = (spi_byte_mode & ~RT68ICE_SPI_CONF_TRSZ(3))
+                            | RT68ICE_SPI_CONF_TRSZ(3);
+        /*
+         * Hardware-specific to the RT68ICE spi_master core: START copies
+         * the persistent TX buffer into a separate RX/TX shift register.
+         * Transfers leave the TX buffer unchanged, so every START below
+         * reuses these dummy 0xffff bits without reloading the registers.
+         * Controllers with a shared data register or TX FIFO may instead
+         * require dummy data to be supplied for every transfer.
+         */
+        RT68ICE_SPI_DTHI = 0xff;
+        RT68ICE_SPI_DTLW = 0xff;
+        while (len >= 2) {
+            RT68ICE_SPI_CDST = RT68ICE_SPI_START;
+            while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+                ;
+            if (buf) {
+                *buf++ = RT68ICE_SPI_DTHI;
+                *buf++ = RT68ICE_SPI_DTLW;
+            }
+            len -= 2;
+        }
+        RT68ICE_SPI_CONF = spi_byte_mode;
+    }
+    if (len) {
+        UBYTE last = spi_recv_byte();
+        if (buf)
+            *buf = last;
+    }
+}
+
+void spi_send_block(const UBYTE *buf, UWORD len)
+{
+    if (len >= 2) {
+        while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+            ;
+        RT68ICE_SPI_CONF = (spi_byte_mode & ~RT68ICE_SPI_CONF_TRSZ(3))
+                            | RT68ICE_SPI_CONF_TRSZ(3);
+        while (len >= 2) {
+            RT68ICE_SPI_DTHI = *buf++;
+            RT68ICE_SPI_DTLW = *buf++;
+            RT68ICE_SPI_CDST = RT68ICE_SPI_START;
+            while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+                ;
+            len -= 2;
+        }
+        RT68ICE_SPI_CONF = spi_byte_mode;
+    }
+    if (len)
+        spi_send_byte(*buf);
 }
