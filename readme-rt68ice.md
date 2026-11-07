@@ -6,6 +6,11 @@ See the [RT68ICE validation report](https://github.com/fabbrimichele/rt68ice/blo
 for on-board CoreMark and YAARTTT results, test configuration and coverage,
 and the unresolved Dhrystone timing and GEMBench compatibility issues.
 
+## Software compatibility
+
+Record application test results in the
+[EmuTOS software compatibility list](doc/software-compatibility.md).
+
 ## Building and loading EmuTOS
 
 Build the RT68ICE image with:
