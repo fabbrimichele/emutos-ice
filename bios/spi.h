@@ -21,4 +21,10 @@ void spi_initialise(void);
 UBYTE spi_recv_byte(void);
 void spi_send_byte(UBYTE input);
 
+#ifdef MACHINE_RT68ICE
+/* Payload transfers; receive also supports NULL to discard the payload. */
+void spi_recv_block(UBYTE *buf, UWORD len);
+void spi_send_block(const UBYTE *buf, UWORD len);
+#endif
+
 #endif /* _SPI_H */
