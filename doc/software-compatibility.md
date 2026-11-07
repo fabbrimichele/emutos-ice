@@ -87,7 +87,7 @@ different configuration.
 | GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x480 / 1 bpp (monochrome) | 2026-11-07 | Works | User reports working; specific calculations, input methods and exit behaviour not recorded. |
 | GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x400 / 1 bpp (monochrome) | 2026-11-07 | Works | User reports working; specific calculations, input methods and exit behaviour not recorded. |
 | GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x480 / 2 bpp (4 colours) | 2026-11-07 | Works | User reports working; green desktop visible. Specific calculations, input methods and exit behaviour not recorded. |
-| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 320x240 / 8 bpp (256 colours) | 2026-11-07 | Partial | Application runs, but the title bar is completely black and its right-hand button is invisible. The C: desktop window has the same issue; its invisible button still works. Shared colour/rendering issue suspected. |
+| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 320x240 / 8 bpp (256 colours) | 2026-11-07 | Works | Initial black title bar resolved after disabling XControl colour-module loading and rebooting. Specific calculations, input methods and exit behaviour not recorded. |
 | Everest | 3.6Eß (23.1.1999) | C01 | 640x480 / 1 bpp (monochrome) | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
 | Everest | 3.6Eß (23.1.1999) | C01 | 640x480 / 2 bpp (4 colours) | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
 | Everest | 3.6Eß (23.1.1999) | C01 | 640x240 / 4 bpp (16 colours) | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
@@ -124,22 +124,23 @@ record of a separate test at that resolution. The reported mode list included
 
 ## Observed issues
 
-### Shared GEM window issue — black title bar in low-resolution modes
+### Resolved configuration issue — black title bar in low-resolution modes
 
-- Configuration: C01.
-- User initially reported the application working, then observed a completely
-  black window title bar with the button at its right not visible.
-- Opening Disk C: in the desktop shows the same title-bar problem. Its
-  invisible right-hand button remains clickable and works.
-- The user also observed the black-title-bar problem at `320x200 / 4 bpp`
-  (16 colours). This observation does not establish a complete CALC workflow
-  test in that mode, so no additional CALC compatibility row is inferred.
-- This affects both CALC and a desktop window at `320x240 / 8 bpp`, and is also
-  observed at `320x200 / 4 bpp`. It therefore is not restricted to 8 bpp.
-  A shared window colour/rendering issue is suspected, but the root cause and
-  whether resolution or colour depth is the trigger remain unconfirmed.
-- The other three tested modes retain their reported working status; this
-  specific visual detail has not been separately confirmed in those modes.
+- Configuration: C01 source builds; control-panel colour settings were changed
+  during the investigation, as noted in the affected result above.
+- CALC and the desktop C: window showed a completely black title bar with an
+  invisible right-hand button at `320x240 / 8 bpp`. The button still worked.
+  The title-bar issue was also observed at `320x200 / 4 bpp`.
+- The user reported the problem fixed after the suggested reset test:
+  disabling XControl colour-module loading and rebooting. The instructions
+  were to rename `WCOLORS.CPX` to `WCOLORS.OFF`, and also `COLOR.CPX` to
+  `COLOR.OFF` if needed. Which module(s) were disabled was not specified.
+- This resolves the reported symptom through control-panel configuration;
+  no EmuTOS rendering or FPGA change was required. The exact saved setting
+  responsible has not been identified.
+- Restoring fresh CPX files from their original distribution is an option for
+  re-enabling the modules without their previously saved settings.
+- No separate complete CALC workflow test is recorded for `320x200 / 4 bpp`.
 
 ## Detailed result template
 
