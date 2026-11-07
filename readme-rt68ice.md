@@ -201,32 +201,46 @@ interrogation mode.
 
 ## SD SPI payload transfers
 
-The RT68ICE driver uses the SPI core's existing 16-bit transfer mode for
-payload byte pairs. It accesses Data High and Data Low through the existing
-byte registers, requiring no FPGA change. Each 512-byte payload now uses 256
-START/completion sequences. Commands, tokens, response polling and CRC bytes
-remain in 8-bit mode. The driver preserves the clock divisor and restores
-8-bit mode before returning, including for odd-length and discarded payloads.
-Other targets retain their existing byte-transfer loops.
+The RT68ICE driver uses 16-bit SPI transfers for payload byte pairs, with
+one CPU word access to the data register per pair. Aligned RAM buffers also
+use word accesses; unaligned buffers use byte packing/unpacking to avoid
+68000 address errors. Each 512-byte payload uses 256 START/completion
+sequences. Commands, tokens, response polling and CRC bytes remain in 8-bit
+SPI mode. The driver preserves the clock divisor and restores 8-bit mode
+before returning, including for odd-length and discarded payloads. Other
+targets retain their existing byte-transfer loops.
 
-Build with `make rt68ice`. Three 4 MiB speed passes completed on the board
-with all payloads verified. Aggregate throughput reached 206.3 KiB/s write
-and 225.5 KiB/s read, improving on the byte-mode baseline by 2.38x and 2.89x
-respectively. Full results are in the
-[validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#16-bit-spi-payload-transfers).
-Mixed-size integrity testing and reboot persistence checks remain pending.
+This build requires the FPGA's new SPI register interface, including low-byte
+data reads. It is incompatible with the earlier split Data High/Data Low map:
 
-After loading the new EmuTOS image, use new filenames for integrity and speed
-checks (the test refuses existing files):
+| CPU address | Driver access |
+| --- | --- |
+| `$F20000` | Word data writes and payload reads |
+| `$F20001` | Byte reads for 8-bit SPI responses |
+| `$F20003` | Byte command/status |
+| `$F20005` | Byte configuration |
+
+Build with `make rt68ice`. On the matching FPGA, three 1 MiB mixed-size
+integrity passes and three 4 MiB speed passes completed with all payloads
+verified. Aggregate throughput reached **245.0 KiB/s write and 293.0 KiB/s
+read**. Compared with the previous driver using separate data-byte registers
+(206.3/225.5 KiB/s), this improves writes by **18.7%** and reads by **29.9%**.
+Full results are in the
+[validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#cpu-word-access-spi-interface).
+Reboot persistence checks remain pending.
+
+After loading this EmuTOS image on the matching FPGA, use new filenames for
+integrity and speed checks (the test refuses existing files):
 
 ```text
-FILETEST run C:\SDCHECK.DAT 1 3
-FILETEST speed C:\SPEED16.DAT 4 3
+FILETEST run C:\CHECKW.DAT 1 3
+FILETEST speed C:\SPEEDW.DAT 4 3
 ```
 
-Compare against the recorded baseline of 86.7 KiB/s write and 78.0 KiB/s read
-using the same card and benchmark binary. After a successful complete run,
-reboot normally and run `FILETEST verify C:\SPEED16.DAT` to check persistence.
+Compare against 206.3 KiB/s write and 225.5 KiB/s read using the same card and
+benchmark binary to measure the additional benefit of CPU word data accesses.
+After a successful complete run, reboot normally and run
+`FILETEST verify C:\SPEEDW.DAT` to check persistence.
 
 ## Remaining work
 

@@ -5,11 +5,11 @@
 #include "emutos.h"
 #include "spi.h"
 
-// Byte access -> odd addresses
-#define RT68ICE_SPI_DTLW  *(volatile UBYTE*)(0xf20001) // Data LSB
-#define RT68ICE_SPI_DTHI  *(volatile UBYTE*)(0xf20003) // Data MSB
-#define RT68ICE_SPI_CDST  *(volatile UBYTE*)(0xf20005) // Command/Status
-#define RT68ICE_SPI_CONF  *(volatile UBYTE*)(0xf20007) // Config
+/* Word data writes/reads; byte receive and control accesses use odd addresses. */
+#define RT68ICE_SPI_DATA  *(volatile UWORD*)(0xf20000) // Full data register
+#define RT68ICE_SPI_RXLO  *(volatile UBYTE*)(0xf20001) // Low received byte
+#define RT68ICE_SPI_CDST  *(volatile UBYTE*)(0xf20003) // Command/Status
+#define RT68ICE_SPI_CONF  *(volatile UBYTE*)(0xf20005) // Config
 
 #define RT68ICE_SPI_CONF_TRSZ(x)  (((x)&0b00000011)<<3)   // Transfer size: 00=4-bit, 01=8-bit, 10=12-bit, 11=16-bit
 #define RT68ICE_SPI_CONF_CDIV(x)  (((x)&0b00000111)<<0)   // Clock divisor: 000=clk/2, 001=clk/4, ..., 111=clk/256
@@ -86,7 +86,7 @@ void spi_initialise(void)
 UBYTE spi_recv_byte(void)
 {
     spi_send_byte(0xff);    // Trigger 8 clock pulses
-    return RT68ICE_SPI_DTLW;    
+    return RT68ICE_SPI_RXLO;
 }
 
 void spi_send_byte(UBYTE input)
@@ -94,8 +94,8 @@ void spi_send_byte(UBYTE input)
     // 1. Wait for BUSY bit (bit 0 of RT68ICE_SPI_CDST) to be 0
     while(RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY);
 
-    // 2. Load the data into Data Low (Address 0)
-    RT68ICE_SPI_DTLW = input;
+    // 2. Data writes require a word access, even for an 8-bit SPI transfer.
+    RT68ICE_SPI_DATA = input;
 
     // 3. Start transfer: assert Start CDST[0] = 1
     RT68ICE_SPI_CDST = RT68ICE_SPI_START;
@@ -107,9 +107,9 @@ void spi_send_byte(UBYTE input)
 
 /*
  * Payload-only helpers.  Commands, tokens and CRC bytes still use byte mode.
- * The existing FPGA interface exposes the two data bytes at separate odd
- * addresses; no CPU word access or buffer alignment is required here.
- * In 16-bit mode DH is shifted first, followed by DL.
+ * The FPGA data register is accessed as a word; SPI shifts its MSB first.
+ * Aligned RAM buffers use word accesses too (the 68000 is big-endian).
+ * Unaligned buffers are packed/unpacked as bytes to avoid address errors.
  */
 void spi_recv_block(UBYTE *buf, UWORD len)
 {
@@ -126,17 +126,29 @@ void spi_recv_block(UBYTE *buf, UWORD len)
          * Controllers with a shared data register or TX FIFO may instead
          * require dummy data to be supplied for every transfer.
          */
-        RT68ICE_SPI_DTHI = 0xff;
-        RT68ICE_SPI_DTLW = 0xff;
-        while (len >= 2) {
-            RT68ICE_SPI_CDST = RT68ICE_SPI_START;
-            while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
-                ;
-            if (buf) {
-                *buf++ = RT68ICE_SPI_DTHI;
-                *buf++ = RT68ICE_SPI_DTLW;
+        RT68ICE_SPI_DATA = 0xffff;
+        if (buf && !((ULONG)buf & 1)) {
+            UWORD *words = (UWORD *)buf;
+            while (len >= 2) {
+                RT68ICE_SPI_CDST = RT68ICE_SPI_START;
+                while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+                    ;
+                *words++ = RT68ICE_SPI_DATA;
+                len -= 2;
             }
-            len -= 2;
+            buf = (UBYTE *)words;
+        } else {
+            while (len >= 2) {
+                RT68ICE_SPI_CDST = RT68ICE_SPI_START;
+                while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+                    ;
+                if (buf) {
+                    UWORD value = RT68ICE_SPI_DATA;
+                    *buf++ = value >> 8;
+                    *buf++ = value;
+                }
+                len -= 2;
+            }
         }
         RT68ICE_SPI_CONF = spi_byte_mode;
     }
@@ -154,13 +166,26 @@ void spi_send_block(const UBYTE *buf, UWORD len)
             ;
         RT68ICE_SPI_CONF = (spi_byte_mode & ~RT68ICE_SPI_CONF_TRSZ(3))
                             | RT68ICE_SPI_CONF_TRSZ(3);
-        while (len >= 2) {
-            RT68ICE_SPI_DTHI = *buf++;
-            RT68ICE_SPI_DTLW = *buf++;
-            RT68ICE_SPI_CDST = RT68ICE_SPI_START;
-            while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
-                ;
-            len -= 2;
+        if (!((ULONG)buf & 1)) {
+            const UWORD *words = (const UWORD *)buf;
+            while (len >= 2) {
+                RT68ICE_SPI_DATA = *words++;
+                RT68ICE_SPI_CDST = RT68ICE_SPI_START;
+                while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+                    ;
+                len -= 2;
+            }
+            buf = (const UBYTE *)words;
+        } else {
+            while (len >= 2) {
+                UWORD value = (UWORD)buf[0] << 8 | buf[1];
+                buf += 2;
+                RT68ICE_SPI_DATA = value;
+                RT68ICE_SPI_CDST = RT68ICE_SPI_START;
+                while (RT68ICE_SPI_CDST & RT68ICE_SPI_CDST_BUSY)
+                    ;
+                len -= 2;
+            }
         }
         RT68ICE_SPI_CONF = spi_byte_mode;
     }
