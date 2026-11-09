@@ -208,6 +208,12 @@ if the calculated value differs from the header.
 - 14 MiB SDRAM.  EmuTOS is loaded at `0x00d80000`, reserving its upper
   512 KiB image and leaving 13.5 MiB available to the system; video memory
   begins at `0x00e00000`.
+  YAARTTT 0.2.3 tested approximately 13.35 MiB of free SDRAM: ten complete
+  passes and pass 11 in progress, with zero reported errors. See the
+  [memory validation results](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#yaarttt-memory-integrity).
+  Dedicated byte-lane preservation and mixed byte/word/longword checks would
+  extend this coverage; they are optional follow-up tests. Reserved OS memory,
+  low-memory BRAM and the framebuffer were outside the YAARTTT test range.
 - Serial console at 57600 baud.
 - SD card storage using SPI mode (one data bit).
 - Onboard SPI flash image loading and EmuTOS boot via the ROM monitor, including
@@ -323,8 +329,6 @@ After a successful complete run, reboot normally and run
   hardware, driver implementation, file-integrity tests, sequential-throughput
   measurements and verification after a reboot are complete for the tested
   configuration.
-- Extend SDRAM tests with byte-lane and mixed-size access checks; see the
-  validation report for the existing CPU and RAM results.
 - Extend `rt68ice_ikbd_writeb()` to support mouse and keyboard IKBD commands.
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
