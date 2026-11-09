@@ -254,17 +254,6 @@ interrogation mode.
 
 ### Testing USB port routing
 
-Run the host-side driver regression tests with:
-
-```sh
-python3 tools/test_rt68ice_usb.py
-```
-
-These exercise the production handlers with simulated registers, including
-all keyboard/mouse port arrangements, shared keys/modifiers and mouse buttons,
-gamepad assignment, and joystick interrogation. They require a host C compiler
-with AddressSanitizer and UndefinedBehaviorSanitizer support.
-
 After loading the updated EmuTOS image, check typing, modifiers, mouse movement
 and clicks with the keyboard and mouse connected to different port pairs,
 resetting between arrangements. Also test two keyboards holding the same key
