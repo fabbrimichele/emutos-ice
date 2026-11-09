@@ -25,8 +25,11 @@ serial loading and flash programming.
 
 ### Serial loading
 
-With the autoboot monitor, press **ESC** in the serial terminal during the
-approximately 10-second startup window to enter the monitor. Then load it with:
+Set **SW1 OFF and SW0 OFF**, then press the reset button to enter the monitor
+immediately. Alternatively, with SW1 ON, press **ESC** in the serial terminal
+during the approximately 10-second startup window. See
+[Reset button and boot switches](#reset-button-and-boot-switches) below.
+Then load it with:
 
 ```shell
 python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-rt68ice.img
@@ -42,8 +45,9 @@ for `Done.` before entering `run 00D80000`.
 The current RT68ICE `main` branch provides a two-port SPI controller:
 port 0 remains the SD card and port 1 accesses the onboard 32 MiB W25Q256JV
 flash through the ECP5 `USRMCLK` primitive. Its updated monitor supports
-`loadflash` and `boot`, and automatically boots after an approximately
-10-second window during which ESC on the serial terminal cancels autoboot.
+`loadflash` and `boot`, with startup behavior selected by the DIP switches:
+enter the monitor, boot immediately, or boot after an approximately 10-second
+window during which ESC on the serial terminal cancels autoboot.
 
 After building EmuTOS here, close the serial terminal and run these commands
 from the sibling **rt68ice repository**, with its updated bitstream built:
@@ -71,10 +75,35 @@ it does not modify flash and is not persistent across power cycles. To persist
 the updated FPGA design, the separate `make prog-flash` target programs the
 **FPGA bitstream**, not EmuTOS.
 
-With the autoboot monitor, reset prints the title followed by:
+### Reset button and boot switches
+
+The current FPGA design connects an active-low reset button to the system
+reset logic. Pressing it resets the system; reset remains asserted while the
+button is held and for approximately 20 ms after its synchronized release.
+The monitor restarts and reads the boot switches once per reset. Set the
+switches before pressing reset to apply a new selection.
+
+| SW1 | SW0 | Startup behavior |
+| --- | --- | --- |
+| OFF | OFF | Enter the monitor immediately. |
+| OFF | ON | Load, validate and boot the flash image immediately (normally EmuTOS). |
+| ON | Either | Wait approximately 10 seconds, then boot; serial ESC cancels to the monitor. |
+
+**SW1 overrides SW0. SW2 is reserved and currently ignored.** ON corresponds
+to a logical set bit: the FPGA synchronizes and inverts the physical switch
+inputs. The read-only DIP-switch device occupies `$F2C000`–`$F2FFFF`; a word
+read at `$F2C000` returns SW0, SW1 and SW2 in bits 0, 1 and 2, with the other
+bits zero. Writes have no effect. This is an RT68ICE-specific device, separate
+from the Atari DIP-switch interface.
+
+These options require the matching FPGA bitstream and monitor; rebuilding
+EmuTOS alone does not add them. Further details are in the RT68ICE
+[flash and monitor documentation](https://github.com/fabbrimichele/rt68ice/blob/main/doc/spi_flash.md#monitor-image-loading).
+
+With SW1 ON, reset prints the title followed by:
 
 ```text
-Press ESC on serial to start monitor (10 seconds)...
+Boot: EmuTOS in 10 seconds; ESC on serial enters monitor
 ```
 
 Press **ESC** (ASCII 27, `0x1b`) on the **serial terminal** during this window
@@ -84,7 +113,11 @@ restarting the countdown, so incidental serial input does not cancel autoboot.
 If no ESC is received, the monitor automatically runs the same load-and-validate
 path as `boot`. USB keyboard input does not
 cancel the countdown. The delay uses a software polling loop calibrated for
-25 MHz, so its duration is approximate. The older monitor requires manual boot.
+25 MHz, so its duration is approximate. Immediate boot (SW1 OFF, SW0 ON)
+does not offer this cancellation window; select both switches OFF and reset
+to recover the monitor prompt.
+
+### Manual flash loading and booting
 
 At the monitor prompt:
 
@@ -103,7 +136,8 @@ boot
 
 `boot` loads and validates the flash image again, then jumps to its load
 address only if successful. Neither command takes an address argument or
-writes flash. At the conservative SPI clock, loading can take tens of seconds.
+writes flash. Flash loading and validation take additional time after the
+selected startup delay; the current monitor uses a 1.5625 MHz SPI clock.
 Missing/corrupt images, invalid ranges, busy flash or SPI timeouts return to
 the monitor without booting. A failed load may leave untrusted data in SDRAM;
 do not manually execute it.
@@ -159,8 +193,12 @@ if the calculated value differs from the header.
   VDI support for 256 palette entries; the FPGA receives 24-bit RGB palette
   values. Lower-depth modes retain ST-compatible palette handling, with white
   background/black foreground in both monochrome modes.
-- USB keyboard on port 1 and mouse on port 2.
-- USB gamepads on ports 3 (Atari joystick 1) and 4 (Atari joystick 0).
+- USB keyboards and mice on any of the four ports. Multiple keyboards share
+  keyboard input, with held keys and modifiers tracked per port; multiple mice
+  share the pointer and combine their held buttons.
+- USB gamepads on any port: the first two detected gamepads in physical port
+  order map to Atari joystick 1, then joystick 0. With gamepads on ports 3
+  and 4, this preserves the previous mapping. Additional gamepads are ignored.
   Directions map to the Atari joystick direction bits; A, B, X and Y each
   act as fire. Select and Start are ignored. The driver sends standard IKBD
   joystick packets through `joyvec` when the state changes, and supports
@@ -170,11 +208,19 @@ if the calculated value differs from the header.
 - 14 MiB SDRAM.  EmuTOS is loaded at `0x00d80000`, reserving its upper
   512 KiB image and leaving 13.5 MiB available to the system; video memory
   begins at `0x00e00000`.
+  YAARTTT 0.2.3 tested approximately 13.35 MiB of free SDRAM: ten complete
+  passes and pass 11 in progress, with zero reported errors. See the
+  [memory validation results](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#yaarttt-memory-integrity).
+  Dedicated byte-lane preservation and mixed byte/word/longword checks would
+  extend this coverage; they are optional follow-up tests. Reserved OS memory,
+  low-memory BRAM and the framebuffer were outside the YAARTTT test range.
 - Serial console at 57600 baud.
 - SD card storage using SPI mode (one data bit).
 - Onboard SPI flash image loading and EmuTOS boot via the ROM monitor, including
-  automatic boot with an approximately 10-second serial cancellation window
-  (with the current RT68ICE `main` FPGA design and monitor; press ESC to cancel).
+  DIP-selected monitor, immediate boot and delayed boot modes. Delayed boot
+  offers an approximately 10-second serial ESC cancellation window.
+- Hardware reset button and three read-only DIP switches, with boot settings
+  applied on reset (requires the matching FPGA design and monitor).
 - 200 Hz system timer.
 - DS1302 real-time clock used by the BIOS date/time calls. RTC years 2000–2099
   map to the corresponding GEMDOS dates; set the clock with `Tsetdate`/`Tsettime`
@@ -193,8 +239,10 @@ make -C ../emutos-apps/joytest
 Copy `../emutos-apps/joytest/joytest.prg` to the SD card and run it under
 EmuTOS. Alternatively, start a ZMODEM receiver on RT68ICE and run
 `make -C ../emutos-apps/joytest send-setting-port` on the host.
-Connect a gamepad
-to USB port 3 for joystick 1, or port 4 for joystick 0. The program displays
+Connect one gamepad to any USB port for joystick 1. With two gamepads, the
+lower-numbered port supplies joystick 1 and the higher-numbered port supplies
+joystick 0. Connect devices before reset for these tests; disconnect cleanup
+and hot swapping are not covered by this change. The program displays
 both joystick states whenever they change. Test each direction and A/B/X/Y:
 up is `01`, down `02`, left `04`, right `08`, and fire `80`; combinations
 OR these bits together. Releasing all controls should return the state to
@@ -204,7 +252,22 @@ Press any keyboard key to exit and restore the previous joystick callback.
 This tests the USB interrupt and IKBD event callback path; it does not test
 interrogation mode.
 
+### Testing USB port routing
+
+After loading the updated EmuTOS image, check typing, modifiers, mouse movement
+and clicks with the keyboard and mouse connected to different port pairs,
+resetting between arrangements. Also test two keyboards holding the same key
+and two mice holding the same button: releasing one must leave the other
+device's press active. Physical board validation of this routing change is
+pending. It uses the existing FPGA USB register interface and requires no new
+bitstream.
+
 ## SD SPI payload transfers
+
+SD-card SPI hardware support and the EmuTOS driver are implemented and have
+passed the file-integrity and throughput tests recorded below. Further
+performance improvements are optional. Verification after a reboot also passed,
+as reported by the user on 2026-11-09.
 
 The RT68ICE driver uses 16-bit SPI transfers for payload byte pairs, with
 one CPU word access to the data register per pair. Aligned RAM buffers also
@@ -232,7 +295,9 @@ read**. Compared with the previous driver using separate data-byte registers
 (206.3/225.5 KiB/s), this improves writes by **18.7%** and reads by **29.9%**.
 Full results are in the
 [validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#cpu-word-access-spi-interface).
-Reboot persistence checks remain pending.
+The user also confirmed successful file verification after a reboot on
+2026-11-09, validating persistence for the tested configuration. The test
+filename and command output were not recorded with that confirmation.
 
 After loading this EmuTOS image on the matching FPGA, use new filenames for
 integrity and speed checks (the test refuses existing files):
@@ -249,42 +314,26 @@ After a successful complete run, reboot normally and run
 
 ## Remaining work
 
-- Prioritize SD-card throughput: measure the time spent in GEMDOS, SD block
-  transfers and the SPI byte-transfer loop, then reduce the dominant overhead.
-  The driver now starts and polls each payload byte pair; profile the remaining
-  overhead and investigate an FPGA FIFO or sector buffer before changing the
-  SD bus width.
-- Continue SD-card file-integrity, sequential-throughput and reboot/readback
-  tests. Extend SDRAM tests with byte-lane and mixed-size access checks; see
-  the validation report for the existing CPU, RAM and partial SD results.
-- Boot and recovery behaviour for absent or corrupt SD media.
+- Check boot and recovery behaviour for absent or corrupt SD media. SD SPI
+  hardware, driver implementation, file-integrity tests, sequential-throughput
+  measurements and verification after a reboot are complete for the tested
+  configuration.
 - Extend `rt68ice_ikbd_writeb()` to support mouse and keyboard IKBD commands.
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
 - Use FPGA RAM as an SDRAM cache.
-- Consider native four-bit SD-card mode after measuring the improvements
-  available from the existing SPI path.
 
-## Suggested implementation order
+## Optional SD performance improvements
 
-1. Use the recorded `filetest speed` results: three verified 4 MiB passes per
-   version, improving from 86.7/78.0 KiB/s write/read in byte mode to
-   206.3/225.5 KiB/s with 16-bit payloads. Verification is outside the timed
-   transfers. Record configuration and future comparisons in the
-   [validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#sd-card-sequential-throughput).
-2. Measure sector-transfer time separately from filesystem time. Check how much
-   time is spent starting and polling SPI transfers, rather than shifting
-   data on the wire, before choosing an optimization.
-3. Optimize the measured bottleneck. For the SPI path, investigate continuous
-   block transfers with a FIFO or sector buffer and efficient CPU buffer access,
-   reducing per-byte register operations and software polling. Preserve the
-   shared controller's SD/flash selection and verify monitor flash boot.
-4. Repeat the same sequential benchmark, mixed-size file-integrity tests and
-   normal-reboot readback checks after each change. Compare throughput as well
-   as correctness before expanding the design.
-5. Reassess native four-bit SD, an SDRAM cache, and a 68020/32 MiB memory-map
-   upgrade against the remaining measured limitations. These are later options;
-   improving SD performance is the immediate priority. Keep the existing video
-   architecture and 640x480 display target for this work.
+If further SD performance work is needed, use **245.0 KiB/s write and
+293.0 KiB/s read** as the current baseline. Profile filesystem and
+sector-transfer time before choosing a change. Possible improvements include
+continuous SPI transfers with an FPGA FIFO or sector buffer; native four-bit
+SD mode is a larger future extension.
+
+Any such change should preserve shared SD/flash controller selection and be
+checked with the same mixed-size integrity, sequential-throughput and
+normal-reboot readback tests, plus monitor flash boot. Record results in the
+[validation report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#cpu-word-access-spi-interface).

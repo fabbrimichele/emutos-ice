@@ -29,10 +29,11 @@ Use copies of sample documents so each session is easy to repeat.
 
 | Status | Meaning |
 | --- | --- |
-| Works | All tasks listed in the row succeeded; other features remain untested |
-| Partial | Some tasks work, but a failure or workaround limits use |
+| Works | Tested tasks work in at least one listed supported mode; mode restrictions are recorded separately |
+| Partial | Functional limitations remain within the listed supported modes; screen-mode restrictions alone do not imply Partial |
 | Fails | The intended basic workflow cannot be completed |
 | Not tested | Candidate only; no result yet |
+| Unsupported mode | Program explicitly rejects the selected mode; this alone is not a platform failure |
 
 ## Configurations
 
@@ -77,21 +78,23 @@ tested firmware configuration.
 
 ## Compatibility list
 
-One row per program version, configuration and screen mode tested. Include
-resolution and colour depth (for example, `640x480 mono`) in the screen-mode
-column. Reuse C01 across modes; retain older results when retesting on a
-different configuration.
+Use one row per program version and configuration. List resolution and colour
+depth in the two mode columns: supported modes are those tested successfully;
+non-working/unsupported modes are those tested with problems or explicitly
+rejected by the program. Explain the distinction and any workaround in the
+notes. Unlisted modes remain untested; "None reported" does not imply every
+other mode works. The status describes application functionality in the supported modes, not
+the proportion of screen modes supported.
+Retain older results when retesting on a different configuration. When testing
+on multiple dates, record the dates or date range and put mode-specific
+details in the notes as needed.
 
-| Program | Version | Config | Screen mode | Date tested | Status | Tested actions / limitations |
-| --- | --- | --- | --- | --- | --- | --- |
-| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x480 / 1 bpp (monochrome) | 2026-11-07 | Works | User reports working; specific calculations, input methods and exit behaviour not recorded. |
-| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x400 / 1 bpp (monochrome) | 2026-11-07 | Works | User reports working; specific calculations, input methods and exit behaviour not recorded. |
-| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x480 / 2 bpp (4 colours) | 2026-11-07 | Works | User reports working; green desktop visible. Specific calculations, input methods and exit behaviour not recorded. |
-| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 320x240 / 8 bpp (256 colours) | 2026-11-07 | Works | Initial black title bar resolved after disabling XControl colour-module loading and rebooting. Specific calculations, input methods and exit behaviour not recorded. |
-| Everest | 3.6Eß (23.1.1999) | C01 | 640x480 / 1 bpp (monochrome) | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
-| Everest | 3.6Eß (23.1.1999) | C01 | 640x480 / 2 bpp (4 colours) | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
-| Everest | 3.6Eß (23.1.1999) | C01 | 640x240 / 4 bpp (16 colours) | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
-| ... | ... | C01 | ... | YYYY-MM-DD | Not tested | ... |
+| Program | Version | Config | Supported modes (tested, resolution / bpp) | Non-working / unsupported modes (tested, resolution / bpp) | Date tested | Status | Tested actions / limitations |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| GEM Calculator — Axel T. Schreiner (`CALC.PRG`) | Not stated; local `CALC_2` copy | C01 | 640x480 / 1; 640x400 / 1; 640x480 / 2; 320x240 / 8 | None reported after XControl reset | 2026-11-07 | Works | User reports working in all listed modes; green desktop visible at 640x480 / 2. Black title bar at 320x240 / 8 resolved after disabling XControl colour-module loading and rebooting (see resolved issue below). Specific calculations, input methods and exit behaviour not recorded. |
+| Everest | 3.6Eß (23.1.1999) | C01 | 640x480 / 1; 640x480 / 2; 640x240 / 4 | None reported | 2026-11-07 | Works | Created, saved and reopened a file; search, keyboard Help key, block selection and copy tested successfully. Startup reports minimum resolution 640x200. |
+| Krabat Chess | 1-0b | C01 | 640x480 / 1; 640x400 / 1; 640x200 / 2 | 640x480 / 2; 640x240 / 2; 320x200 (bpp not recorded) | 2026-11-08 | Works | Runs incorrectly at 640x480 / 2 and 640x240 / 2; exact symptoms unrecorded. Rejects 320x200 and asks for at least medium resolution; that restriction alone is not a platform failure. Specific gameplay, input and save/load checks not recorded. |
+| ... | ... | C01 | ... | ... | YYYY-MM-DD | Not tested | ... |
 
 ## Session notes
 
