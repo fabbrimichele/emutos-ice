@@ -227,6 +227,35 @@ if the calculated value differs from the header.
   or the monitor utility described in the RT68ICE DS1302 documentation.
 - PSG-compatible audio.
 
+## Experimental SDRAM cache
+
+The sibling RT68ICE `direct-mapped-cache` branch integrates a 2 KiB unified,
+direct-mapped cache for SDRAM, with one 16-bit word per entry. CPU writes still
+reach SDRAM and invalidate the corresponding cache slot; writes do not allocate
+entries. This requires the branch's FPGA bitstream, with no EmuTOS driver change.
+CPU/system and SDRAM clocks remain 25 MHz and 50 MHz respectively.
+
+User-supplied on-board results on 2026-11-14:
+
+| Benchmark | Uncached | Cached | Improvement |
+| --- | ---: | ---: | --- |
+| SDRAM 256-word copy, counter cycles | 7,191 | 3,733 | 1.93x faster; 48.1% less elapsed time |
+| CoreMark, iterations/s | 7.013069 | 12.861736 | 1.83x score; 83.4% higher iterations/s |
+
+All four cached CoreMark runs were identical and validated successfully. The
+cached YAARTTT log shows three completed passes and pass 4 in progress, with
+zero reported errors over approximately 13.35 MiB of free SDRAM. Monitor data
+bus, row/bank conflict, timing and upper-SDRAM stress checks also passed.
+The copy results are single measurements per configuration; these improvements
+describe the workloads, not raw SDRAM bandwidth. Loaded binary hashes and
+external timer accuracy were not verified.
+
+An initial reset when opening the Desk menu could not be reproduced after
+reprogramming; its cause remains unresolved. Physical cross-domain timing and
+desktop/reset/power-cycle validation remain outstanding before merging the
+cache branch. Full evidence and limitations are in the
+[cached-system validation report](https://github.com/fabbrimichele/rt68ice/blob/direct-mapped-cache/doc/validation.md#cached-system-validation-2026-11-14).
+
 ## Testing joystick input
 
 The generic TOS joystick event diagnostic is maintained in the sibling
@@ -323,7 +352,9 @@ After a successful complete run, reboot normally and run
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
-- Use FPGA RAM as an SDRAM cache.
+- Complete validation of the implemented FPGA-RAM SDRAM cache: review physical
+  cross-domain timing and repeat desktop, reset and power-cycle checks,
+  including the unexplained initial Desk-menu reset noted above.
 
 ## Optional SD performance improvements
 
