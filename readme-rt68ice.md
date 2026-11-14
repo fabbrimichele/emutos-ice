@@ -242,7 +242,10 @@ User-supplied on-board results on 2026-11-14:
 | SDRAM 256-word copy, counter cycles | 7,191 | 3,733 | 1.93x faster; 48.1% less elapsed time |
 | CoreMark, iterations/s | 7.013069 | 12.861736 | 1.83x score; 83.4% higher iterations/s |
 
-All four cached CoreMark runs were identical and validated successfully. The
+All five cached CoreMark runs were identical and validated successfully,
+including a repeat after reboot. The cached score is **6.70x** the published
+[8 MHz Atari ST CoreMark reference](https://github.com/czietz/coremark/wiki/Results)
+of 1.92 iterations/s; this ratio does not describe every application. The
 cached YAARTTT log shows three completed passes and pass 4 in progress, with
 zero reported errors over approximately 13.35 MiB of free SDRAM. Monitor data
 bus, row/bank conflict, timing and upper-SDRAM stress checks also passed.
@@ -250,10 +253,23 @@ The copy results are single measurements per configuration; these improvements
 describe the workloads, not raw SDRAM bandwidth. Loaded binary hashes and
 external timer accuracy were not verified.
 
+With the cached bitstream, `FILETEST run C:\CACHE01.DAT 1 3` completed three
+1 MiB write/close/reopen/verify passes. After reboot,
+`FILETEST verify C:\CACHE01.DAT` verified the retained pass-3 header, every
+payload byte and exact length, confirming persistence for that file and
+configuration. Integrity-mode timings include pattern generation and checking;
+they are not a comparison with the sequential `speed` workload.
+
 An initial reset when opening the Desk menu could not be reproduced after
-reprogramming; its cause remains unresolved. Physical cross-domain timing and
-desktop/reset/power-cycle validation remain outstanding before merging the
-cache branch. Full evidence and limitations are in the
+reprogramming; its cause remains unresolved. A detailed nextpnr run finished
+normally, with final per-clock Fmax of 29.12 MHz for system (25 MHz target) and
+77.27 MHz for SDRAM (50 MHz target), using 51/56 block RAMs. However, cross-domain
+path maxima of 25.53 ns and 22.15 ns exceed the shortest nominal 20 ns edge
+interval. The report does not establish required times or setup/hold slack for
+those crossings, so cross-domain timing closure remains unresolved. See the
+[timing review](https://github.com/fabbrimichele/rt68ice/blob/direct-mapped-cache/doc/cache-timing-2026-11-14.md).
+Repeated desktop/menu and power-cycle checks also remain outstanding before
+merging the cache branch. Full evidence and limitations are in the
 [cached-system validation report](https://github.com/fabbrimichele/rt68ice/blob/direct-mapped-cache/doc/validation.md#cached-system-validation-2026-11-14).
 
 ## Testing joystick input
