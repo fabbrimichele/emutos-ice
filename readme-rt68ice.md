@@ -227,50 +227,59 @@ if the calculated value differs from the header.
   or the monitor utility described in the RT68ICE DS1302 documentation.
 - PSG-compatible audio.
 
-## Experimental SDRAM cache
+## SDRAM cache
 
-The sibling RT68ICE `direct-mapped-cache` branch integrates a 2 KiB unified,
-direct-mapped cache for SDRAM, with one 16-bit word per entry. CPU writes still
-reach SDRAM and invalidate the corresponding cache slot; writes do not allocate
-entries. This requires the branch's FPGA bitstream, with no EmuTOS driver change.
-CPU/system and SDRAM clocks remain 25 MHz and 50 MHz respectively.
+The sibling RT68ICE `main` branch integrates a 2 KiB unified, direct-mapped
+cache for SDRAM, with 1,024 one-word entries. CPU writes reach SDRAM and
+invalidate the selected cache slot; writes do not allocate entries. Requests
+and responses between cache and SDRAM are registered. This requires the
+updated FPGA bitstream, with no EmuTOS driver change. CPU/system and SDRAM
+clocks remain 25 MHz and 50 MHz respectively.
 
 User-supplied on-board results on 2026-11-14:
 
-| Benchmark | Uncached | Cached | Improvement |
-| --- | ---: | ---: | --- |
-| SDRAM 256-word copy, counter cycles | 7,191 | 3,733 | 1.93x faster; 48.1% less elapsed time |
-| CoreMark, iterations/s | 7.013069 | 12.861736 | 1.83x score; 83.4% higher iterations/s |
+| Configuration | SDRAM copy counter cycles | CoreMark iterations/s |
+| --- | ---: | ---: |
+| Uncached | 7,191 | 7.013069 |
+| Original 2 KiB cache | 3,733 | 12.861736 |
+| Registered 2 KiB cache | 4,433 | 11.010184–11.013216 |
 
-All five cached CoreMark runs were identical and validated successfully,
-including a repeat after reboot. The cached score is **6.70x** the published
-[8 MHz Atari ST CoreMark reference](https://github.com/czietz/coremark/wiki/Results)
-of 1.92 iterations/s; this ratio does not describe every application. The
-cached YAARTTT log shows three completed passes and pass 4 in progress, with
-zero reported errors over approximately 13.35 MiB of free SDRAM. Monitor data
-bus, row/bank conflict, timing and upper-SDRAM stress checks also passed.
-The copy results are single measurements per configuration; these improvements
-describe the workloads, not raw SDRAM bandwidth. Loaded binary hashes and
-external timer accuracy were not verified.
+The registered cache improves copy workload speed by **1.62x** and CoreMark
+throughput by about **57.0%** versus uncached. Compared with the original
+cache, copy time increases 18.8% and CoreMark throughput falls about 14.4%.
+Registration adds two system cycles total to misses and writes; hit latency
+is unchanged. Copy results are single measurements per configuration and
+include instruction fetches and writes, rather than measuring raw bandwidth.
 
-With the cached bitstream, `FILETEST run C:\CACHE01.DAT 1 3` completed three
-1 MiB write/close/reopen/verify passes. After reboot,
-`FILETEST verify C:\CACHE01.DAT` verified the retained pass-3 header, every
-payload byte and exact length, confirming persistence for that file and
-configuration. Integrity-mode timings include pattern generation and checking;
-they are not a comparison with the sequential `speed` workload.
+The registered version passed monitor data bus, row/bank conflict, timing and
+upper-SDRAM stress checks. YAARTTT completed three passes with zero reported
+errors over `$00026B18`–`$00D80000` (approximately 13.35 MiB); pass 4 was in
+progress. Three CoreMark runs all validated with matching CRCs: two at 3,632
+ticks/11.013216 iterations/s, and one at 3,633 ticks/11.010184 iterations/s,
+all with 200 iterations. Loaded binary hashes and external timer accuracy
+were not verified.
 
-An initial reset when opening the Desk menu could not be reproduced after
-reprogramming; its cause remains unresolved. A detailed nextpnr run finished
-normally, with final per-clock Fmax of 29.12 MHz for system (25 MHz target) and
-77.27 MHz for SDRAM (50 MHz target), using 51/56 block RAMs. However, cross-domain
-path maxima of 25.53 ns and 22.15 ns exceed the shortest nominal 20 ns edge
-interval. The report does not establish required times or setup/hold slack for
-those crossings, so cross-domain timing closure remains unresolved. See the
-[timing review](https://github.com/fabbrimichele/rt68ice/blob/direct-mapped-cache/doc/cache-timing-2026-11-14.md).
-Repeated desktop/menu and power-cycle checks also remain outstanding before
-merging the cache branch. Full evidence and limitations are in the
-[cached-system validation report](https://github.com/fabbrimichele/rt68ice/blob/direct-mapped-cache/doc/validation.md#cached-system-validation-2026-11-14).
+The original cache version completed five identical validated CoreMark runs,
+including one after reboot. It also passed three 1 MiB
+`FILETEST run C:\CACHE01.DAT 1 3` write/close/reopen/verify passes and a
+post-reboot `FILETEST verify C:\CACHE01.DAT`, checking the retained header,
+every payload byte and exact length. These FILETEST/persistence results apply
+to the original cache; they have not been repeated for the registered version.
+Integrity-mode timings are not comparable with the sequential `speed` workload.
+
+An initial Desk-menu reset on the original cache could not be reproduced after
+reprogramming; its cause remains unresolved. The registered-interface timing
+run reports cross-domain maxima of **11.370 ns** and **7.841 ns**, below the
+shortest nominal 20 ns edge interval, with all final per-clock checks passing
+and 51/56 block RAMs used. The report does not establish explicit related-clock
+setup/hold slack, so full timing sign-off remains outstanding. Repeated
+desktop/reset/power-cycle checks also remain useful. The loaded hardware build
+was not tied to the archived route by hash.
+
+See the [registered-cache hardware results](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#registered-cache-hardware-validation-2026-11-14)
+and [interface timing report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/cache-registered-interface.md).
+Four-word lines, burst reads and a larger cache are planned improvements,
+not features of the tested implementation.
 
 ## Testing joystick input
 
@@ -368,9 +377,12 @@ After a successful complete run, reboot normally and run
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
 - Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
-- Complete validation of the implemented FPGA-RAM SDRAM cache: review physical
-  cross-domain timing and repeat desktop, reset and power-cycle checks,
-  including the unexplained initial Desk-menu reset noted above.
+- Complete related-clock setup/hold sign-off and repeat desktop, reset,
+  power-cycle and FILETEST checks with the registered SDRAM cache. SDRAM
+  diagnostics, three YAARTTT passes and three validated CoreMark runs are
+  complete; the initial Desk-menu reset's cause remains unresolved.
+- Extend the SDRAM cache to four-word burst-filled lines and evaluate an 8 KiB
+  data capacity, retaining single-word write-through initially.
 
 ## Optional SD performance improvements
 
