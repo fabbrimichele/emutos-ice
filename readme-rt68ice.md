@@ -236,13 +236,29 @@ and responses between cache and SDRAM are registered. This requires the
 updated FPGA bitstream, with no EmuTOS driver change. CPU/system and SDRAM
 clocks remain 25 MHz and 50 MHz respectively.
 
+The original cache had long combinational paths between the system and SDRAM
+clock domains: reported maxima were 25.528 ns and 22.153 ns, exceeding their
+shortest nominal 20 ns edge interval. Passing per-clock build checks did not
+establish that these crossings met timing. Registers were added to capture
+requests going to SDRAM and data/completion returning to the cache, breaking
+those long paths into shorter paths. The new maxima are 11.370 ns and
+7.841 ns. This improves timing margin at the cost of two extra system cycles
+per miss or write; cache hits keep their previous latency. Registration was
+the chosen timing improvement, rather than a requirement of caching itself;
+explicit related-clock setup/hold sign-off remains outstanding.
+
 User-supplied on-board results on 2026-11-14:
 
-| Configuration | SDRAM copy counter cycles | CoreMark iterations/s |
-| --- | ---: | ---: |
-| Uncached | 7,191 | 7.013069 |
-| Original 2 KiB cache | 3,733 | 12.861736 |
-| Registered 2 KiB cache | 4,433 | 11.010184–11.013216 |
+| Configuration | SDRAM copy counter cycles | Copy speed vs uncached | CoreMark iterations/s | CoreMark score vs uncached |
+| --- | ---: | ---: | ---: | ---: |
+| Uncached baseline | 7,191 | 1.00x | 7.013069 | 1.00x |
+| Original 2 KiB cache, before registers (historical) | 3,733 | 1.93x | 12.861736 | 1.83x |
+| **Current: registered 2 KiB cache** | **4,433** | **1.62x** | **11.010184–11.013216** | **1.57x** |
+
+Copy speed is the uncached cycle count divided by the measured cycle count.
+CoreMark score is measured iterations/s divided by uncached iterations/s.
+Higher ratios indicate better performance in both columns. The current cache's CoreMark ratio is
+**1.57x**; **1.83x** describes the historical cache before registration.
 
 The registered cache improves copy workload speed by **1.62x** and CoreMark
 throughput by about **57.0%** versus uncached. Compared with the original
