@@ -128,6 +128,11 @@ _cold_reset:
         jsr     _flush_data_cache
         move.l  0x00e00004,a0   // Get the entry adress from offset 4 in the ROM
         jmp     (a0)
+#elif defined(MACHINE_RT68ICE)
+        // Restart the loaded image with cold-boot memory initialization.
+        clr.l   memvalid.w
+        jsr     _flush_data_cache
+        jmp     _main
 #elif CONF_ATARI_HARDWARE
         clr.l   memvalid.w      // Invalidate memvalid
         jsr     _flush_data_cache

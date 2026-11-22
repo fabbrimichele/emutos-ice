@@ -91,7 +91,6 @@ static void extract_time(struct hms *out, UWORD time)
 
 #ifdef MACHINE_RT68ICE
 /* RT68ICE maps the DS1302 registers on even addresses in the upper byte. */
-#define RT68ICE_RTC_BASE       0x00f28000UL
 #define RT68ICE_RTC_SECONDS    0x00
 #define RT68ICE_RTC_MINUTES    0x02
 #define RT68ICE_RTC_HOURS      0x04

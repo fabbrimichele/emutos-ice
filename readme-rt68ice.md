@@ -11,6 +11,59 @@ and the unresolved Dhrystone timing and GEMBench compatibility issues.
 Record application test results in the
 [EmuTOS software compatibility list](doc/software-compatibility.md).
 
+## Relocated device map
+
+This branch matches rt68ice commit `effa82f` on `expand-memory-32mb`, which
+moves the framebuffer and devices above 32 MiB. It requires that relocated
+FPGA bitstream; images built here no longer use the legacy device addresses.
+
+| Device | New CPU address |
+| --- | ---: |
+| Framebuffer | `$02000000` |
+| LED | `$02100000` |
+| UART | `$02104000` |
+| Palette | `$02108000` |
+| Video control / VBL acknowledgement | `$0210C000` / `$0210C002` |
+| LED array | `$02114000` |
+| USB global registers / first host | `$02118000` / `$02118010` |
+| Timer / timer acknowledgement | `$0211C000` / `$0211C002` |
+| SD SPI controller | `$02120000` |
+| YM2149 PSG | `$02124000` |
+| DS1302 RTC | `$02128000` |
+
+`include/rt68ice_mmap.h` supplies the shared bases for C drivers, assembly
+interrupt handlers and the framebuffer configuration. Register offsets,
+access widths, interrupt levels and SPI transfer sizes remain unchanged.
+Other EmuTOS targets retain their original maps.
+
+The EmuTOS payload still loads at `$00D80000`, with 13.5 MiB configured as
+ST-RAM and 512 KiB reserved for the image in the existing 14 MiB SDRAM window.
+This is the device-relocation step, not the 32 MiB RAM expansion. The monitor's
+serial image header and flash image offset remain unchanged.
+
+Build and load with the commands below. After loading on the matching FPGA,
+check boot/display, serial and USB keyboard input, mouse movement, timer/key
+repeat, VBL/video-mode changes, sound and SD access. Then repeat YAART and
+CoreMark and file-integrity verification. Successful standalone FPGA tests
+preceded this EmuTOS update. Board testing confirmed mouse, keyboard, screen,
+sound and SD boot. Selecting C: restored accessory loading and desktop
+configuration loading/saving; subsequent physical resets preserved C:.
+YAART, CoreMark and file-integrity checks on the relocated EmuTOS remain pending.
+External binaries with hard-coded MMIO addresses, such as CACHSTAT.TOS from
+emutos-apps, also need matching updates before use.
+
+Local verification: `make rt68ice` completed successfully. Disassembly confirms
+timer/VBL acknowledgements at `$0211C002` / `$0210C002` and relocated peripheral
+operands. The generated monitor image loads at `$00D80000` and includes a
+payload length and CRC-32 checksum generated from `emutos.img`.
+
+An earlier relocated image reached SD initialization, then panicked during
+`gettime()`: the board-specific RTC code in the generic `bios/clock.c` file
+still used the retired `$00F28000` address. The RTC base now comes from the
+shared memory map as well. The rebuilt RTC object was checked for all eight
+relocated register operands and absence of the legacy base. The corrected
+image subsequently booted successfully on the relocated-device bitstream.
+
 ## Building and loading EmuTOS
 
 Build the RT68ICE image with:
@@ -22,6 +75,26 @@ make rt68ice
 This generates both `emutos.img` (the raw payload) and `emutos-rt68ice.img`
 (the payload with the monitor header). Use the **headered** image for both
 serial loading and flash programming.
+
+### EmuTOS welcome screen and startup drive
+
+The RT68ICE target displays the EmuTOS welcome screen for up to eight seconds on
+both cold and warm starts (`ALWAYS_SHOW_INITINFO=1`, `INITINFO_DURATION=8`).
+This keeps drive selection accessible after a monitor reload that retains RAM
+and the old boot-drive variable. Previously the default cold-boot-only welcome
+could be skipped on such reloads.
+
+At this EmuTOS screen, press **C** to select the SD-card C: drive, **Shift** to
+hold the screen, or **Esc** to enter EmuCON. This is separate from the earlier
+ROM-monitor countdown, where Esc stays in the monitor. Leave **Ctrl** and
+**Alt** released for normal startup: Ctrl skips accessories/configuration and
+Alt forces floppy boot. Holding either also ends the welcome countdown
+immediately, so release both before starting EmuTOS. Accessories and `EMUDESK.INF` are read from the startup
+drive, and the desktop saves its configuration back to its starting drive.
+If C: contains those files, select C: before checking accessory loading or
+saving the desktop. This does not prove that a remaining file-save error is
+fixed; if it persists with the correct startup drive, inspect the actual path,
+file attributes and returned GEMDOS error.
 
 ### Serial loading
 
@@ -83,6 +156,20 @@ button is held and for approximately 20 ms after its synchronized release.
 The monitor restarts and reads the boot switches once per reset. Set the
 switches before pressing reset to apply a new selection.
 
+EmuTOS software restarts do not return to the monitor or reset the FPGA:
+Ctrl+Alt+Delete performs a warm restart, and Ctrl+Alt+Right Shift+Delete
+(without Left Shift) invalidates the RAM configuration marker for a cold
+restart of the loaded EmuTOS image. A cold restart selects C: if available;
+a warm restart preserves the boot drive. Early RT68ICE initialization masks
+inherited peripheral interrupts until each driver installs its handlers.
+Board testing confirmed that software restart no longer hangs after the version
+banner. Held Ctrl/Alt keys can still override boot options after either shortcut,
+selecting A: and skipping accessories/configuration; investigation is deferred
+to a separate branch (see [TODO](doc/rt68ice.md)).
+
+The physical button does not explicitly clear SDRAM or the EmuTOS boot
+markers, so a button reset does not guarantee cold-boot initialization.
+
 | SW1 | SW0 | Startup behavior |
 | --- | --- | --- |
 | OFF | OFF | Enter the monitor immediately. |
@@ -91,8 +178,8 @@ switches before pressing reset to apply a new selection.
 
 **SW1 overrides SW0. SW2 is reserved and currently ignored.** ON corresponds
 to a logical set bit: the FPGA synchronizes and inverts the physical switch
-inputs. The read-only DIP-switch device occupies `$F2C000`–`$F2FFFF`; a word
-read at `$F2C000` returns SW0, SW1 and SW2 in bits 0, 1 and 2, with the other
+inputs. The read-only DIP-switch device occupies `$0212C000`–`$0212FFFF`; a word
+read at `$0212C000` returns SW0, SW1 and SW2 in bits 0, 1 and 2, with the other
 bits zero. Writes have no effect. This is an RT68ICE-specific device, separate
 from the Atari DIP-switch interface.
 
@@ -188,7 +275,7 @@ if the calculated value differs from the header.
   0/1/2. The boot default is ST High (640x400 monochrome). VIDEL-style mode
   descriptions distinguish the ST modes using `VIDEL_COMPAT`; the six extended
   modes retain their existing descriptions. All modes use the framebuffer at
-  `0x00e00000`; the FPGA supplies the borders for the ST modes. The largest
+  `0x02000000`; the FPGA supplies the borders for the ST modes. The largest
   modes still require 75 KiB of video RAM. The 8-bitplane mode has full EmuTOS
   VDI support for 256 palette entries; the FPGA receives 24-bit RGB palette
   values. Lower-depth modes retain ST-compatible palette handling, with white
@@ -207,7 +294,7 @@ if the calculated value differs from the header.
   keycode modes are not implemented. Both joysticks can coexist with the mouse.
 - 14 MiB SDRAM.  EmuTOS is loaded at `0x00d80000`, reserving its upper
   512 KiB image and leaving 13.5 MiB available to the system; video memory
-  begins at `0x00e00000`.
+  begins at `0x02000000`.
   YAARTTT 0.2.3 tested approximately 13.35 MiB of free SDRAM: ten complete
   passes and pass 11 in progress, with zero reported errors. See the
   [memory validation results](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#yaarttt-memory-integrity).
@@ -229,7 +316,15 @@ if the calculated value differs from the header.
 
 ## SDRAM cache
 
-The sibling RT68ICE `main` branch integrates a 2 KiB unified, direct-mapped
+The current FPGA has an 8 KiB unified cache with four-word burst fills,
+write-hit updates and a single-entry posted-write buffer. The latest supplied
+CoreMark mean is 15.170670 iterations/s, 116.32% above uncached. These results
+predate device relocation and are not hardware validation of the new image.
+See the [complete performance progression](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#cache-performance-progression).
+
+### Historical registered 2 KiB cache results (2026-11-14)
+
+The version tested in this historical section integrated a 2 KiB unified, direct-mapped
 cache for SDRAM, with 1,024 one-word entries. CPU writes reach SDRAM and
 invalidate the selected cache slot; writes do not allocate entries. Requests
 and responses between cache and SDRAM are registered. This requires the
@@ -253,7 +348,7 @@ User-supplied on-board results on 2026-11-14:
 | --- | ---: | ---: | ---: | ---: |
 | Uncached baseline | 7,191 | 1.00x | 7.013069 | 1.00x |
 | Original 2 KiB cache, before registers (historical) | 3,733 | 1.93x | 12.861736 | 1.83x |
-| **Current: registered 2 KiB cache** | **4,433** | **1.62x** | **11.010184–11.013216** | **1.57x** |
+| **Registered 2 KiB cache (historical)** | **4,433** | **1.62x** | **11.010184–11.013216** | **1.57x** |
 
 Copy speed is the uncached cycle count divided by the measured cycle count.
 CoreMark score is measured iterations/s divided by uncached iterations/s.
@@ -294,8 +389,8 @@ was not tied to the archived route by hash.
 
 See the [registered-cache hardware results](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#registered-cache-hardware-validation-2026-11-14)
 and [interface timing report](https://github.com/fabbrimichele/rt68ice/blob/main/doc/cache-registered-interface.md).
-Four-word lines, burst reads and a larger cache are planned improvements,
-not features of the tested implementation.
+Four-word lines, burst reads and a larger cache were not features of that
+tested implementation; they were implemented and tested in later FPGA versions.
 
 ## Testing joystick input
 
@@ -329,8 +424,8 @@ and clicks with the keyboard and mouse connected to different port pairs,
 resetting between arrangements. Also test two keyboards holding the same key
 and two mice holding the same button: releasing one must leave the other
 device's press active. Physical board validation of this routing change is
-pending. It uses the existing FPGA USB register interface and requires no new
-bitstream.
+pending. The routing feature itself did not require a register-interface change;
+the current image additionally requires the relocated FPGA device map above.
 
 ## SD SPI payload transfers
 
@@ -353,10 +448,10 @@ data reads. It is incompatible with the earlier split Data High/Data Low map:
 
 | CPU address | Driver access |
 | --- | --- |
-| `$F20000` | Word data writes and payload reads |
-| `$F20001` | Byte reads for 8-bit SPI responses |
-| `$F20003` | Byte command/status |
-| `$F20005` | Byte configuration |
+| `$02120000` | Word data writes and payload reads |
+| `$02120001` | Byte reads for 8-bit SPI responses |
+| `$02120003` | Byte command/status |
+| `$02120005` | Byte configuration |
 
 Build with `make rt68ice`. On the matching FPGA, three 1 MiB mixed-size
 integrity passes and three 4 MiB speed passes completed with all payloads
@@ -392,13 +487,16 @@ After a successful complete run, reboot normally and run
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
-- Replace the 68000 with a 68020 and revise the memory map to support 32 MiB.
+- Validate this relocated-device EmuTOS image, then extend the FPGA SDRAM/cache
+  path and EmuTOS memory configuration to expose 32 MiB. CPU address bits 24/25
+  have been verified in the core's 68000 mode; a CPU-mode change is not required
+  solely to emit those addresses.
 - Complete related-clock setup/hold sign-off and repeat desktop, reset,
   power-cycle and FILETEST checks with the registered SDRAM cache. SDRAM
   diagnostics, three YAARTTT passes and three validated CoreMark runs are
   complete; the initial Desk-menu reset's cause remains unresolved.
-- Extend the SDRAM cache to four-word burst-filled lines and evaluate an 8 KiB
-  data capacity, retaining single-word write-through initially.
+- The 8 KiB cache, burst-filled lines, write-hit updates and posted-write buffer
+  are implemented; repeat application/file-I/O checks with the relocated map.
 
 ## Optional SD performance improvements
 

@@ -573,6 +573,7 @@
  * Defaults for the RT68ICE machine
  */
 #ifdef MACHINE_RT68ICE
+# include "rt68ice_mmap.h"
 # ifndef CONF_ATARI_HARDWARE
 #  define CONF_ATARI_HARDWARE 0
 # endif
@@ -587,13 +588,21 @@
 # ifndef CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF
 #  define CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF 0
 # endif
+/* A monitor reload can reuse RAM and retain the previous boot drive.
+ * Keep drive selection and the early CLI accessible on every startup. */
+# ifndef ALWAYS_SHOW_INITINFO
+#  define ALWAYS_SHOW_INITINFO 1
+# endif
+# ifndef INITINFO_DURATION
+#  define INITINFO_DURATION 8
+# endif
 /* TODO: try CONF_WITH_BUS_ERROR 1 */
 # ifndef CONF_WITH_BUS_ERROR
 #  define CONF_WITH_BUS_ERROR 0
 # endif
 /* TODO: configure size and planes */
 # ifndef CONF_VRAM_ADDRESS
-#  define CONF_VRAM_ADDRESS 0x00E00000
+#  define CONF_VRAM_ADDRESS RT68ICE_FRAMEBUFFER_BASE
 # endif
 /* 13.5 MB RAM of free RAM, 512 KB are used as ROM */
 # ifndef CONF_STRAM_SIZE

@@ -3,13 +3,14 @@
  */
 
 #include "emutos.h"
+#include "rt68ice_mmap.h"
 #include "spi.h"
 
 /* Word data writes/reads; byte receive and control accesses use odd addresses. */
-#define RT68ICE_SPI_DATA  *(volatile UWORD*)(0xf20000) // Full data register
-#define RT68ICE_SPI_RXLO  *(volatile UBYTE*)(0xf20001) // Low received byte
-#define RT68ICE_SPI_CDST  *(volatile UBYTE*)(0xf20003) // Command/Status
-#define RT68ICE_SPI_CONF  *(volatile UBYTE*)(0xf20005) // Config
+#define RT68ICE_SPI_DATA  *(volatile UWORD*)(RT68ICE_SPI_BASE) // Full data register
+#define RT68ICE_SPI_RXLO  *(volatile UBYTE*)((RT68ICE_SPI_BASE + 0x01)) // Low received byte
+#define RT68ICE_SPI_CDST  *(volatile UBYTE*)((RT68ICE_SPI_BASE + 0x03)) // Command/Status
+#define RT68ICE_SPI_CONF  *(volatile UBYTE*)((RT68ICE_SPI_BASE + 0x05)) // Config
 
 #define RT68ICE_SPI_CONF_TRSZ(x)  (((x)&0b00000011)<<3)   // Transfer size: 00=4-bit, 01=8-bit, 10=12-bit, 11=16-bit
 #define RT68ICE_SPI_CONF_CDIV(x)  (((x)&0b00000111)<<0)   // Clock divisor: 000=clk/2, 001=clk/4, ..., 111=clk/256

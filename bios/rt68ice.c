@@ -11,6 +11,7 @@
  */
 
 #include "emutos.h"
+#include "rt68ice_mmap.h"
 #include "rt68ice.h"
 #include "vectors.h"
 #include "tosvars.h"
@@ -30,30 +31,30 @@ static void rt68ice_usb_report_joysticks(void);
 static void process_usb_modifier(UBYTE, UBYTE, UBYTE, UBYTE);
 
 /* Custom registers */
-#define LED      *(volatile UBYTE*)(0x00f00000) // LED-mapped register base address
-#define LEDS     *(volatile UWORD*)(0x00f14000) // LED array mapped register base address
+#define LED      *(volatile UBYTE*)(RT68ICE_LED_BASE) // LED-mapped register base address
+#define LEDS     *(volatile UWORD*)(RT68ICE_LEDS_BASE) // LED array mapped register base address
 
 /* Serial registers */
-#define UART_RBR *(volatile UBYTE*)(0x00f04000) // Receive Buffer Register(RBR) / Transmitter Holding Register(THR) / Divisor Latch (LSB)
-#define UART_IER *(volatile UBYTE*)(0x00f04002) // Interrupt enable register / Divisor Latch (MSB)
-#define UART_IIR *(volatile UBYTE*)(0x00f04004) // Interrupt Identification Register
-#define UART_LCR *(volatile UBYTE*)(0x00f04006) // Line control register
-#define UART_MCR *(volatile UBYTE*)(0x00f04008) // MODEM control register
-#define UART_LSR *(volatile UBYTE*)(0x00f0400a) // Line status register
-#define UART_MSR *(volatile UBYTE*)(0x00f0400c) // MODEM status register
+#define UART_RBR *(volatile UBYTE*)(RT68ICE_UART_BASE) // Receive Buffer Register(RBR) / Transmitter Holding Register(THR) / Divisor Latch (LSB)
+#define UART_IER *(volatile UBYTE*)((RT68ICE_UART_BASE + 0x02)) // Interrupt enable register / Divisor Latch (MSB)
+#define UART_IIR *(volatile UBYTE*)((RT68ICE_UART_BASE + 0x04)) // Interrupt Identification Register
+#define UART_LCR *(volatile UBYTE*)((RT68ICE_UART_BASE + 0x06)) // Line control register
+#define UART_MCR *(volatile UBYTE*)((RT68ICE_UART_BASE + 0x08)) // MODEM control register
+#define UART_LSR *(volatile UBYTE*)((RT68ICE_UART_BASE + 0x0a)) // Line status register
+#define UART_MSR *(volatile UBYTE*)((RT68ICE_UART_BASE + 0x0c)) // MODEM status register
 
 #define UART_IER_INT_RHR        0x01 // Enable interrupt on receive holding register
 #define UART_LSR_THE            0x20 // Transmission Holding Empty
 
 /* Programmable timer (68000 autovector interrupt level 5) */
-#define TIMER_CONTROL       *(volatile UWORD*)(0x00f1c000) // bit 0 enable, bit 1 auto-reload, bit 2 IRQ enable, bit 3 reload command
-#define TIMER_STATUS        *(volatile UWORD*)(0x00f1c002) // bit 0 IRQ pending (read to clear), bit 1 running
-#define TIMER_DIVIDER_HI    *(volatile UWORD*)(0x00f1c004) // divider bits 31-16
-#define TIMER_DIVIDER_LO    *(volatile UWORD*)(0x00f1c006) // divider bits 15-0
-#define TIMER_RELOAD_HI     *(volatile UWORD*)(0x00f1c008) // reload value bits 31-16
-#define TIMER_RELOAD_LO     *(volatile UWORD*)(0x00f1c00a) // reload value bits 15-0
-#define TIMER_VALUE_HI      *(volatile UWORD*)(0x00f1c00c) // current value bits 31-16; latches VALUE_LO
-#define TIMER_VALUE_LO      *(volatile UWORD*)(0x00f1c00e) // latched current value bits 15-0
+#define TIMER_CONTROL       *(volatile UWORD*)(RT68ICE_TIMER_BASE) // bit 0 enable, bit 1 auto-reload, bit 2 IRQ enable, bit 3 reload command
+#define TIMER_STATUS        *(volatile UWORD*)(RT68ICE_TIMER_STATUS_ADDR) // bit 0 IRQ pending (read to clear), bit 1 running
+#define TIMER_DIVIDER_HI    *(volatile UWORD*)((RT68ICE_TIMER_BASE + 0x04)) // divider bits 31-16
+#define TIMER_DIVIDER_LO    *(volatile UWORD*)((RT68ICE_TIMER_BASE + 0x06)) // divider bits 15-0
+#define TIMER_RELOAD_HI     *(volatile UWORD*)((RT68ICE_TIMER_BASE + 0x08)) // reload value bits 31-16
+#define TIMER_RELOAD_LO     *(volatile UWORD*)((RT68ICE_TIMER_BASE + 0x0a)) // reload value bits 15-0
+#define TIMER_VALUE_HI      *(volatile UWORD*)((RT68ICE_TIMER_BASE + 0x0c)) // current value bits 31-16; latches VALUE_LO
+#define TIMER_VALUE_LO      *(volatile UWORD*)((RT68ICE_TIMER_BASE + 0x0e)) // latched current value bits 15-0
 
 #define TIMER_ENABLE        0x0001
 #define TIMER_AUTO_RELOAD   0x0002
@@ -62,10 +63,10 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE, UBYTE);
 #define TIMER_IRQ_PENDING   0x0001
 
 /* Screen */
-#define VIDEO_CTRL          *(volatile UWORD*)(0x00f0c000) // Resolution control
-#define VIDEO_IRQ_STATUS    *(volatile UWORD*)(0x00f0c002) // Bit 0 VBL pending; read to acknowledge
-#define VIDEO_IRQ_ENABLE    *(volatile UWORD*)(0x00f0c004) // Bit 0 VBL interrupt enable
-#define VIDEO_PLTE          (void *)(0x00f08000)           // Video Palette address
+#define VIDEO_CTRL          *(volatile UWORD*)(RT68ICE_VIDEO_CTRL_BASE) // Resolution control
+#define VIDEO_IRQ_STATUS    *(volatile UWORD*)(RT68ICE_VIDEO_IRQ_STATUS_ADDR) // Bit 0 VBL pending; read to acknowledge
+#define VIDEO_IRQ_ENABLE    *(volatile UWORD*)((RT68ICE_VIDEO_CTRL_BASE + 0x04)) // Bit 0 VBL interrupt enable
+#define VIDEO_PLTE          (void *)(RT68ICE_VIDEO_PALETTE_BASE)           // Video Palette address
 
 #define VIDEO_IRQ_VBL       0001
 
@@ -81,10 +82,10 @@ static void process_usb_modifier(UBYTE, UBYTE, UBYTE, UBYTE);
 
 /* USB */
 // Global interrupt registers
-#define USB_IRQ_STATUS  *(volatile UWORD*)(0x00f18000)   // Read-only pending bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Does not acknowledge a host.
-#define USB_IRQ_ENABLE  *(volatile UWORD*)(0x00f18002)   // Read/write mask bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Reset value $0000 disables USB CPU interrupts.
+#define USB_IRQ_STATUS  *(volatile UWORD*)(RT68ICE_USB_BASE)   // Read-only pending bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Does not acknowledge a host.
+#define USB_IRQ_ENABLE  *(volatile UWORD*)((RT68ICE_USB_BASE + 0x02))   // Read/write mask bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Reset value $0000 disables USB CPU interrupts.
 
-/* Each host occupies 16 word registers, starting at $F18010. */
+/* Each host occupies 16 word registers, starting at $02118010. */
 #define USB_PORT_COUNT 4
 struct rt68ice_usb_host {
     UWORD status;       /* Read acknowledges this host; error bit 7, type bits 1..0. */
@@ -96,7 +97,7 @@ struct rt68ice_usb_host {
     UWORD keys[4];      /* HID boot-keyboard usage IDs, zero for no key. */
     UWORD reserved[6];
 };
-#define USB_HOSTS ((volatile struct rt68ice_usb_host *)0x00f18010)
+#define USB_HOSTS ((volatile struct rt68ice_usb_host *)(RT68ICE_USB_BASE + 0x10))
 
 #define USB_DEV_TYPE        0x0003
 #define USB_DEV_TYPE_KEY    0x1
@@ -112,11 +113,19 @@ struct rt68ice_usb_host {
 #define USB_PAD_FIRE        0x003c  /* A, B, X or Y */
 
 
-/* Initialize Native Features */
-extern void rt68ice_init(void) 
+/* Called with CPU interrupts masked, before vecs_init() replaces the vectors. */
+void rt68ice_init(void)
 {
-    // Debug
-    //LEDS = 0x1;
+    /* A software restart leaves FPGA peripherals running.  In particular,
+     * pending USB/UART interrupts must stay masked until their drivers have
+     * installed handlers: the temporary just_rte vectors cannot acknowledge
+     * them and would otherwise cause an interrupt loop during BIOS startup.
+     * Each driver restores its interrupt enable during initialization.
+     */
+    USB_IRQ_ENABLE = 0;
+    UART_IER = 0;
+    VIDEO_IRQ_ENABLE = 0;
+    TIMER_CONTROL = 0;
 }
 
 

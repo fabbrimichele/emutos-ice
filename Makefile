@@ -1508,7 +1508,7 @@ NODEP += makefile.dep
 # for trivial changes. This would be useless in most cases. As a pragmatic
 # workaround, makefile.dep only depends on generated sources, which ensures
 # they are always created first.
-makefile.dep: $(GEN_SRC)
+makefile.dep: $(GEN_SRC) include/rt68ice_mmap.h
 	$(CC) $(CFLAGS) -MM -DGENERATING_DEPENDENCIES $(DEP_SRC) | sed -e '/:/s,^,obj/,' >makefile.dep
 
 # Do not include or rebuild makefile.dep for the targets listed in NODEP

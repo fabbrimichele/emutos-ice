@@ -1,3 +1,5 @@
+#include "rt68ice_mmap.h"
+
 //#ifdef MACHINE_RT68ICE
 
 /******************************************************************************/
@@ -23,8 +25,7 @@ _rt68ice_timer_int:
         // Defer USB until int_timerc returns with RTE, which restores the
         // interrupted SR (including its original interrupt mask).
         move.w  #0x2600,sr
-        // TODO: use TIMER_STATUS
-        tst.w   0x00f1c002              // Clear FPGA timer IRQ (if a read/test clears it without clobbering registers)
+        tst.w   RT68ICE_TIMER_STATUS_ADDR              // Clear FPGA timer IRQ (if a read/test clears it without clobbering registers)
         move.l  _vector_5ms,-(sp)   
         rts                             // Tail-call jump to int_timerc
 
@@ -34,8 +35,7 @@ _rt68ice_timer_int:
         .globl  _rt68ice_vbl_int
 _rt68ice_vbl_int:
         movem.l d0-d1/a0-a1,-(sp)       // C code does not preserve these registers
-        // TODO: use VIDEO_IRQ_STATUS
-        tst.w   0x00f0c002              // Read status to acknowledge the VBL
+        tst.w   RT68ICE_VIDEO_IRQ_STATUS_ADDR              // Read status to acknowledge the VBL
         jbsr    _int_vbl                // Call the standard VBL handler
         movem.l (sp)+,d0-d1/a0-a1
         rte
