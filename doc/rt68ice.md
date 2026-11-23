@@ -13,4 +13,10 @@ rt68ice is an FPGA single board computer based on 68000
 
 The active device map is documented in
 [the RT68ICE port README](../readme-rt68ice.md#relocated-device-map).
-Devices now start above 32 MiB; the larger SDRAM window remains follow-up work.
+Devices start above 32 MiB. The FPGA RAM expansion passed standalone board
+tests; the new EmuTOS image loads at `$01F80000` and configures 31.5 MiB
+contiguous ST-RAM, reserving the top 512 KiB. The updated monitor accepts its
+high load address. Boot and 31.5 MiB ST-RAM were confirmed after a power cycle.
+YAARTTT reported
+`$00026AE8–$01F80000`; completed-pass results, CoreMark, peripherals,
+accessories/configuration and reset checks remain pending.

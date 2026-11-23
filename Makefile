@@ -485,7 +485,7 @@ OBJECTS = $(CORE_OBJ) $(OPTIONAL_OBJ) $(END_OBJ)
 
 TOCLEAN += obj/*.ld
 
-obj/emutospp.ld: emutos.ld include/config.h tosvars.ld
+obj/emutospp.ld: emutos.ld include/config.h include/rt68ice_mmap.h tosvars.ld
 	$(CPP) $(CPPFLAGS) -P -x c $< -o $@
 
 #
@@ -641,7 +641,7 @@ TOCLEAN += *.img
 
 IMG_RT68ICE = emutos-rt68ice.img
 RT68ICE_DEFS =
-LOAD_ADDRESS := 00D80000 # 14MB - 512KB ( = EmuTOS dedicated space)
+LOAD_ADDRESS := 01F80000 # 32 MiB - 512 KiB, matching RT68ICE_OS_BASE
 
 .PHONY: rt68ice
 NODEP += rt68ice

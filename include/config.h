@@ -604,9 +604,9 @@
 # ifndef CONF_VRAM_ADDRESS
 #  define CONF_VRAM_ADDRESS RT68ICE_FRAMEBUFFER_BASE
 # endif
-/* 13.5 MB RAM of free RAM, 512 KB are used as ROM */
+/* 31.5 MiB contiguous ST-RAM; the final 512 KiB holds the loaded OS. */
 # ifndef CONF_STRAM_SIZE
-#  define CONF_STRAM_SIZE 13824 * 1024UL
+#  define CONF_STRAM_SIZE RT68ICE_OS_BASE
 # endif
 
 # ifndef CONF_WITH_SDMMC

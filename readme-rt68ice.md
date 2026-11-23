@@ -36,10 +36,30 @@ interrupt handlers and the framebuffer configuration. Register offsets,
 access widths, interrupt levels and SPI transfer sizes remain unchanged.
 Other EmuTOS targets retain their original maps.
 
-The EmuTOS payload still loads at `$00D80000`, with 13.5 MiB configured as
-ST-RAM and 512 KiB reserved for the image in the existing 14 MiB SDRAM window.
-This is the device-relocation step, not the 32 MiB RAM expansion. The monitor's
-serial image header and flash image offset remain unchanged.
+The EmuTOS payload now loads at `$01F80000`, with 31.5 MiB configured as
+contiguous ST-RAM (`$00000000–$01F7FFFF`) and the final 512 KiB of the 32 MiB
+SDRAM window reserved for the OS (`$01F80000–$01FFFFFF`). The linker enforces
+that reservation. The serial image header and flash image offset are unchanged.
+
+**Requires the updated RT68ICE monitor and 32 MiB FPGA build.** The older
+monitor rejects images above its 14 MiB load limit. Rebuild with
+`make rt68ice.bit` and program the FPGA before uploading this image; the FPGA
+RAM expansion alone is not sufficient if its monitor is still the old version.
+The matching monitor accepts image ends through `$02000000` exclusively.
+
+Power-cycle the board or perform a cold restart when switching from an image
+with a different RAM size, so warm-boot settings from the previous image are
+not reused.
+
+Local validation: `make rt68ice` succeeds. The monitor image has a 233,732-byte
+payload at `$01F80000` with CRC-32 `1AACF76A`; its header, payload and checksum
+were verified, and the link map confirms the ST-RAM/OS boundaries. Board
+validation on 2026-11-23 confirmed boot at `$01F80000` and 31.5 MiB ST-RAM after
+a power cycle. A warm start initially reused the old 13,824 KiB limit, as
+expected without a cold restart. YAARTTT selected the expanded range
+`$00026AE8–$01F80000`; completed passes have not yet been reported. Repeat
+CoreMark, accessories/configuration, peripheral and reset checks as well.
+The full 32 MiB standalone RAM tests passed before this OS relocation.
 
 Build and load with the commands below. After loading on the matching FPGA,
 check boot/display, serial and USB keyboard input, mouse movement, timer/key
@@ -54,7 +74,7 @@ emutos-apps, also need matching updates before use.
 
 Local verification: `make rt68ice` completed successfully. Disassembly confirms
 timer/VBL acknowledgements at `$0211C002` / `$0210C002` and relocated peripheral
-operands. The generated monitor image loads at `$00D80000` and includes a
+operands. The generated monitor image loads at `$01F80000` and includes a
 payload length and CRC-32 checksum generated from `emutos.img`.
 
 An earlier relocated image reached SD initialization, then panicked during
@@ -109,9 +129,9 @@ python3 ~/rt68ice/tools/serial_load.py --port /dev/ttyACM0 --baud 57600 emutos-r
 ```
 
 Close any serial terminal before loading. The script sends the image unchanged
-and then sends `run 00D80000`; the monitor performs the CRC check. To load without
+and then sends `run 01F80000`; the monitor performs the CRC check. To load without
 automatically sending `run`, add `--no-run`, reconnect the terminal, and check
-for `Done.` before entering `run 00D80000`.
+for `Done.` before entering `run 01F80000`.
 
 ### Flash programming and booting
 
@@ -214,7 +234,7 @@ loadflash
 
 This reads the fixed flash offset `0x00100000`, validates the image and copies
 its payload to the address from its header. It should print `Done.` and
-`Loaded at 00D80000`, then stay in the monitor. Enter `run 00D80000` to execute
+`Loaded at 01F80000`, then stay in the monitor. Enter `run 01F80000` to execute
 the loaded image, or use:
 
 ```text
@@ -242,7 +262,7 @@ The image is a big-endian monitor transfer image, not a raw `emutos.img`:
 | Offset | Size | Field |
 | --- | ---: | --- |
 | `0x00` | 4 bytes | ASCII magic `RT68` |
-| `0x04` | 4 bytes | Load address (`0x00d80000`) |
+| `0x04` | 4 bytes | Load address (`0x01f80000`) |
 | `0x08` | 4 bytes | Payload length |
 | `0x0c` | 4 bytes | CRC-32/ISO-HDLC of the payload |
 | `0x10` | variable | Raw EmuTOS payload |
@@ -292,10 +312,11 @@ if the calculated value differs from the header.
   event reporting (`0x14`), interrogation mode (`0x15`), interrogation
   (`0x16`), and disabling joystick events (`0x1a`). Joystick monitoring and
   keycode modes are not implemented. Both joysticks can coexist with the mouse.
-- 14 MiB SDRAM.  EmuTOS is loaded at `0x00d80000`, reserving its upper
-  512 KiB image and leaving 13.5 MiB available to the system; video memory
+- 32 MiB SDRAM. EmuTOS is loaded at `0x01f80000`, reserving the top
+  512 KiB and leaving 31.5 MiB as contiguous ST-RAM; video memory
   begins at `0x02000000`.
-  YAARTTT 0.2.3 tested approximately 13.35 MiB of free SDRAM: ten complete
+  On the previous 13.5 MiB configuration, YAARTTT 0.2.3 tested approximately
+  13.35 MiB of free SDRAM: ten complete
   passes and pass 11 in progress, with zero reported errors. See the
   [memory validation results](https://github.com/fabbrimichele/rt68ice/blob/main/doc/validation.md#yaarttt-memory-integrity).
   Dedicated byte-lane preservation and mixed byte/word/longword checks would

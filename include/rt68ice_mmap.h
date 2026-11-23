@@ -1,10 +1,15 @@
 /*
  * RT68ICE device addresses, shared by C, assembly and target configuration.
- * Matches the FPGA device block relocated above 32 MiB. Register offsets and
- * widths are unchanged; this does not expand the SDRAM window.
+ * Matches the FPGA device block above the 32 MiB SDRAM window. Register offsets
+ * and widths are unchanged; the loaded OS is reserved at the top of SDRAM.
  */
 #ifndef RT68ICE_MMAP_H
 #define RT68ICE_MMAP_H
+
+/* The loaded OS occupies the final 512 KiB of the 32 MiB SDRAM window. */
+#define RT68ICE_SDRAM_END            0x02000000
+#define RT68ICE_OS_BASE              0x01f80000
+#define RT68ICE_OS_SIZE              0x00080000
 
 #define RT68ICE_FRAMEBUFFER_BASE     0x02000000
 #define RT68ICE_LED_BASE             0x02100000

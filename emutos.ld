@@ -24,7 +24,7 @@ OUTPUT_FORMAT(binary)
 # define ROM_ORIGIN 0x00fc0000
 #elif defined(MACHINE_RT68ICE)
 /* For RT68ICE simulate ROM in RAM, when not using EMUTOS_LIVES_IN_RAM */
-# define ROM_ORIGIN 0x00d80000
+# define ROM_ORIGIN RT68ICE_OS_BASE
 #elif defined(TARGET_CART)
 # define ROM_ORIGIN 0x00fa0000
 #elif defined(TARGET_192)
@@ -37,7 +37,11 @@ OUTPUT_FORMAT(binary)
  * Then our padding tool will eventually report an overflow, with a better
  * diagnostic message than the linker.
  */
+#ifdef MACHINE_RT68ICE
+#define ROM_LENGTH RT68ICE_OS_SIZE
+#else
 #define ROM_LENGTH 1M /* Maximum size before I/O area */
+#endif
 
 #endif /* !EMUTOS_LIVES_IN_RAM */
 
@@ -46,7 +50,11 @@ OUTPUT_FORMAT(binary)
  */
 MEMORY
 {
+#ifdef MACHINE_RT68ICE
+    stram : ORIGIN = 0x00000000, LENGTH = RT68ICE_OS_BASE
+#else
     stram : ORIGIN = 0x00000000, LENGTH = 14M
+#endif
 #if !EMUTOS_LIVES_IN_RAM
     rom : ORIGIN = ROM_ORIGIN, LENGTH = ROM_LENGTH
 #endif
