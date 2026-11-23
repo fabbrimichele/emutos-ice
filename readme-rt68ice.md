@@ -57,8 +57,11 @@ were verified, and the link map confirms the ST-RAM/OS boundaries. Board
 validation on 2026-11-23 confirmed boot at `$01F80000` and 31.5 MiB ST-RAM after
 a power cycle. A warm start initially reused the old 13,824 KiB limit, as
 expected without a cold restart. YAARTTT selected the expanded range
-`$00026AE8–$01F80000`; completed passes have not yet been reported. Repeat
-CoreMark, accessories/configuration, peripheral and reset checks as well.
+`$00026AE8–$01F80000` and completed six full passes with zero errors by
+55:55, with pass 7 continuing cleanly. One CoreMark run validated at
+15.180265 iterations/sec (2,635 ticks, 13.175 seconds, 200 iterations),
+consistent with the previous approximately 15.17 baseline. Further CoreMark
+repetitions and peripheral, file-I/O, flash-boot and reset checks remain useful.
 The full 32 MiB standalone RAM tests passed before this OS relocation.
 
 Build and load with the commands below. After loading on the matching FPGA,
@@ -68,7 +71,8 @@ CoreMark and file-integrity verification. Successful standalone FPGA tests
 preceded this EmuTOS update. Board testing confirmed mouse, keyboard, screen,
 sound and SD boot. Selecting C: restored accessory loading and desktop
 configuration loading/saving; subsequent physical resets preserved C:.
-YAART, CoreMark and file-integrity checks on the relocated EmuTOS remain pending.
+Expanded-range YAART and one CoreMark run passed as recorded above; repeat
+file-integrity checks on the new image when validating application I/O.
 External binaries with hard-coded MMIO addresses, such as CACHSTAT.TOS from
 emutos-apps, also need matching updates before use.
 
@@ -508,10 +512,11 @@ After a successful complete run, reboot normally and run
   It currently handles joystick reporting commands; USB mouse and keyboard
   input is delivered directly by the interrupt handlers, without implementing
   the corresponding IKBD commands.
-- Validate this relocated-device EmuTOS image, then extend the FPGA SDRAM/cache
-  path and EmuTOS memory configuration to expose 32 MiB. CPU address bits 24/25
-  have been verified in the core's 68000 mode; a CPU-mode change is not required
-  solely to emit those addresses.
+- The 32 MiB FPGA SDRAM/cache path and top-of-RAM EmuTOS image are implemented.
+  Six expanded-range YAART passes and one validated CoreMark run passed.
+  CPU address bits 24/25 work in the core's 68000 mode; a CPU-mode change is
+  not required for the expanded memory. Repeat flash-boot/application checks
+  with the new image.
 - Complete related-clock setup/hold sign-off and repeat desktop, reset,
   power-cycle and FILETEST checks with the registered SDRAM cache. SDRAM
   diagnostics, three YAARTTT passes and three validated CoreMark runs are

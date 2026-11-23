@@ -17,6 +17,8 @@ Devices start above 32 MiB. The FPGA RAM expansion passed standalone board
 tests; the new EmuTOS image loads at `$01F80000` and configures 31.5 MiB
 contiguous ST-RAM, reserving the top 512 KiB. The updated monitor accepts its
 high load address. Boot and 31.5 MiB ST-RAM were confirmed after a power cycle.
-YAARTTT reported
-`$00026AE8–$01F80000`; completed-pass results, CoreMark, peripherals,
-accessories/configuration and reset checks remain pending.
+YAARTTT completed six clean passes over `$00026AE8–$01F80000` by 55:55,
+with pass 7 continuing. One CoreMark run validated at 15.180265 iterations/sec,
+consistent with the previous performance baseline. Further peripheral,
+file-I/O, flash-boot and reset checks remain useful; the keyboard-reset boot
+modifier issue above is deferred to a separate branch.
