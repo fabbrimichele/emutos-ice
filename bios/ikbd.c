@@ -736,6 +736,9 @@ void kbd_int(UBYTE scancode)
     if ((scancode == KEY_DELETE)
         && ((shifty & (MODE_ALT|MODE_CTRL|MODE_LSHIFT)) == (MODE_ALT|MODE_CTRL))) {
         /* Del key and shifty is Alt+Ctrl but not LShift */
+#ifdef MACHINE_RT68ICE
+        rt68ice_wait_reset_keys_released();
+#endif
         if (shifty & MODE_RSHIFT) {
             /* Ctrl+Alt+RShift+Del means cold reset */
             cold_reset();

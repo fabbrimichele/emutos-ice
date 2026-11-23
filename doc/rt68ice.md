@@ -3,13 +3,14 @@ rt68ice is an FPGA single board computer based on 68000
 
 # TODO
 
-- Investigate keyboard software-restart boot modifiers in a separate branch.
-  After Ctrl+Alt+Delete or Ctrl+Alt+Right Shift+Delete, startup can see Ctrl
-  and Alt still held: the welcome countdown ends immediately, Alt selects
-  A: instead of C:, and Ctrl skips accessories and the saved desktop
-  configuration. Physical reset followed by selecting C: works. Check how
-  the RT68ICE USB driver reports held keys across restart before changing
-  generic EmuTOS boot logic; preserve deliberate Ctrl/Alt boot options.
+- Validate the keyboard-reset fix on the board. The RT68ICE keyboard reset
+  path now polls hardware USB reports until Ctrl, Alt, right Shift and Delete
+  are released across all keyboard ports, before starting either warm or cold
+  restart. Generic EmuTOS boot-option handling is unchanged. Check both reset
+  shortcuts, keys released in stages, and a chord split across keyboards.
+  Verify the welcome countdown, C: selection, accessories and saved desktop
+  configuration; also verify deliberately pressing Ctrl/Alt during startup.
+  The image builds locally; board results are pending.
 
 The active device map is documented in
 [the RT68ICE port README](../readme-rt68ice.md#relocated-device-map).

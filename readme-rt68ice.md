@@ -51,7 +51,7 @@ Power-cycle the board or perform a cold restart when switching from an image
 with a different RAM size, so warm-boot settings from the previous image are
 not reused.
 
-Local validation: `make rt68ice` succeeds. The monitor image has a 233,732-byte
+RAM-expansion validation: `make rt68ice` succeeded. That monitor image had a 233,732-byte
 payload at `$01F80000` with CRC-32 `1AACF76A`; its header, payload and checksum
 were verified, and the link map confirms the ST-RAM/OS boundaries. Board
 validation on 2026-11-23 confirmed boot at `$01F80000` and 31.5 MiB ST-RAM after
@@ -187,9 +187,19 @@ restart of the loaded EmuTOS image. A cold restart selects C: if available;
 a warm restart preserves the boot drive. Early RT68ICE initialization masks
 inherited peripheral interrupts until each driver installs its handlers.
 Board testing confirmed that software restart no longer hangs after the version
-banner. Held Ctrl/Alt keys can still override boot options after either shortcut,
-selecting A: and skipping accessories/configuration; investigation is deferred
-to a separate branch (see [TODO](doc/rt68ice.md)).
+banner. The subsequent keyboard-reset fix now waits for Ctrl, Alt, right Shift
+and Delete to be released before restarting, polling hardware reports across
+all four USB ports. The old screen remains visible while the chord is held;
+release it to begin the restart. This prevents those held keys from selecting
+A: and skipping accessories/configuration in the next boot. Generic startup
+handling is unchanged: press Ctrl/Alt again during startup for deliberate boot
+options. Physical reset and other software-reset callers are unchanged.
+
+Local validation: `make rt68ice` passes.
+Board validation is pending: test both shortcuts, hold the chord briefly and
+release keys in stages, then check the welcome countdown, C: selection,
+accessories and saved desktop configuration. Verify deliberate Ctrl/Alt boot
+options separately (see [TODO](doc/rt68ice.md)). No FPGA rebuild is required.
 
 The physical button does not explicitly clear SDRAM or the EmuTOS boot
 markers, so a button reset does not guarantee cold-boot initialization.
