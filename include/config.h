@@ -588,14 +588,6 @@
 # ifndef CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF
 #  define CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF 0
 # endif
-/* A monitor reload can reuse RAM and retain the previous boot drive.
- * Keep drive selection and the early CLI accessible on every startup. */
-# ifndef ALWAYS_SHOW_INITINFO
-#  define ALWAYS_SHOW_INITINFO 1
-# endif
-# ifndef INITINFO_DURATION
-#  define INITINFO_DURATION 8
-# endif
 /* TODO: try CONF_WITH_BUS_ERROR 1 */
 # ifndef CONF_WITH_BUS_ERROR
 #  define CONF_WITH_BUS_ERROR 0

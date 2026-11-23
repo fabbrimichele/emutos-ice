@@ -102,11 +102,13 @@ serial loading and flash programming.
 
 ### EmuTOS welcome screen and startup drive
 
-The RT68ICE target displays the EmuTOS welcome screen for up to eight seconds on
-both cold and warm starts (`ALWAYS_SHOW_INITINFO=1`, `INITINFO_DURATION=8`).
-This keeps drive selection accessible after a monitor reload that retains RAM
-and the old boot-drive variable. Previously the default cold-boot-only welcome
-could be skipped on such reloads.
+The RT68ICE target uses the standard EmuTOS welcome behavior: cold starts show
+the welcome screen for up to three seconds; warm restarts skip it
+(`ALWAYS_SHOW_INITINFO=0`, `INITINFO_DURATION=3`). Press **Space** to skip the
+cold-start countdown. The temporary eight-second screen on every startup,
+used to diagnose boot-drive selection, has been removed. A monitor reload can
+retain RAM and count as a warm start; use a cold restart or power cycle if you
+need the welcome screen and drive-selection prompt.
 
 At this EmuTOS screen, press **C** to select the SD-card C: drive, **Shift** to
 hold the screen, or **Esc** to enter EmuCON. This is separate from the earlier
@@ -196,10 +198,11 @@ handling is unchanged: press Ctrl/Alt again during startup for deliberate boot
 options. Physical reset and other software-reset callers are unchanged.
 
 Local validation: `make rt68ice` passes.
-Board validation is pending: test both shortcuts, hold the chord briefly and
-release keys in stages, then check the welcome countdown, C: selection,
-accessories and saved desktop configuration. Verify deliberate Ctrl/Alt boot
-options separately (see [TODO](doc/rt68ice.md)). No FPGA rebuild is required.
+On 2026-11-24, the user confirmed the restored standard welcome behavior works
+on the board: warm reset skips the welcome screen and cold reset uses the
+three-second countdown. Further checks include staged key release, chords split
+across keyboards, C: selection, accessories/configuration and deliberate Ctrl/Alt
+boot options (see [TODO](doc/rt68ice.md)). No FPGA rebuild is required.
 
 The physical button does not explicitly clear SDRAM or the EmuTOS boot
 markers, so a button reset does not guarantee cold-boot initialization.

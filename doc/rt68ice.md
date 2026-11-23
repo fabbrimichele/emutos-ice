@@ -3,14 +3,17 @@ rt68ice is an FPGA single board computer based on 68000
 
 # TODO
 
-- Validate the keyboard-reset fix on the board. The RT68ICE keyboard reset
+- Complete keyboard-reset edge-case checks on the board. The RT68ICE keyboard reset
   path now polls hardware USB reports until Ctrl, Alt, right Shift and Delete
   are released across all keyboard ports, before starting either warm or cold
   restart. Generic EmuTOS boot-option handling is unchanged. Check both reset
   shortcuts, keys released in stages, and a chord split across keyboards.
-  Verify the welcome countdown, C: selection, accessories and saved desktop
+  Verify no welcome delay on warm restart and a three-second welcome countdown
+  on cold restart, plus C: selection, accessories and saved desktop
   configuration; also verify deliberately pressing Ctrl/Alt during startup.
-  The image builds locally; board results are pending.
+  The image builds locally. On 2026-11-24, the user confirmed the restored
+  standard welcome behavior works on the board; the additional checks above
+  have not all been reported.
 
 The active device map is documented in
 [the RT68ICE port README](../readme-rt68ice.md#relocated-device-map).
