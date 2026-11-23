@@ -744,6 +744,41 @@ static BOOL rt68ice_usb_key_present(const UBYTE *keys, UBYTE count, UBYTE usage)
     return FALSE;
 }
 
+static BOOL rt68ice_reset_keys_held(void)
+{
+    UBYTE port, key;
+
+    for (port = 0; port < USB_PORT_COUNT; port++) {
+        UWORD status = USB_HOSTS[port].status;
+
+        if ((status & (USB_DEV_ERROR | USB_DEV_TYPE)) != USB_DEV_TYPE_KEY)
+            continue;
+
+        /* HID modifier bits: left/right Ctrl, left/right Alt, right Shift. */
+        if (USB_HOSTS[port].key_modifiers & 0x75)
+            return TRUE;
+        for (key = 0; key < 4; key++) {
+            UBYTE usage = (UBYTE)USB_HOSTS[port].keys[key];
+
+            /* ErrorRollOver cannot establish that Delete has been released. */
+            if (usage == 0x4c || usage == 0x01)
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void rt68ice_wait_reset_keys_released(void)
+{
+    /* Called from the keyboard interrupt before restarting the OS. USB
+     * snapshots update in hardware, so polling requires no CPU interrupts.
+     * Wait for all keyboards: the chord may be split across several ports.
+     * Do not carry its Ctrl/Alt presses into the next boot's option checks.
+     */
+    while (rt68ice_reset_keys_held())
+        ;
+}
+
 static void rt68ice_usb_send_key(UBYTE usage, BOOL released)
 {
     UBYTE scancode = usb_to_idkb_map[usage];
