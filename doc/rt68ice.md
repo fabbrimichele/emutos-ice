@@ -10,8 +10,7 @@ rt68ice is an FPGA single board computer based on 68000
   shortcuts, keys released in stages, and a chord split across keyboards.
   Verify the welcome countdown, C: selection, accessories and saved desktop
   configuration; also verify deliberately pressing Ctrl/Alt during startup.
-  The image builds and `make -C tests/rt68ice-reset test` passes locally;
-  board results are pending.
+  The image builds locally; board results are pending.
 
 The active device map is documented in
 [the RT68ICE port README](../readme-rt68ice.md#relocated-device-map).

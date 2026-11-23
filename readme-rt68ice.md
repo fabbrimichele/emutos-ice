@@ -195,10 +195,7 @@ A: and skipping accessories/configuration in the next boot. Generic startup
 handling is unchanged: press Ctrl/Alt again during startup for deliberate boot
 options. Physical reset and other software-reset callers are unchanged.
 
-Local validation: `make rt68ice` and `make -C tests/rt68ice-reset test` pass.
-The focused native tests execute the production polling routines with simulated
-USB reports, covering modifier/key positions on all ports, staged release,
-rollover and disconnects. They do not emulate the whole OS or USB hardware.
+Local validation: `make rt68ice` passes.
 Board validation is pending: test both shortcuts, hold the chord briefly and
 release keys in stages, then check the welcome countdown, C: selection,
 accessories and saved desktop configuration. Verify deliberate Ctrl/Alt boot
