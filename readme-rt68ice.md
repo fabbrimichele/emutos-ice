@@ -198,8 +198,9 @@ handling is unchanged: press Ctrl/Alt again during startup for deliberate boot
 options. Physical reset and other software-reset callers are unchanged.
 
 Local validation: `make rt68ice` passes.
-On 2026-11-24, the user confirmed the restored standard welcome behavior works
-on the board: warm reset skips the welcome screen and cold reset uses the
+The keyboard-reset fix and restored standard welcome defaults are implemented
+in `master`. On 2026-11-24, the user confirmed the fix works on the board and
+then confirmed warm reset skips the welcome screen while cold reset uses the
 three-second countdown. Further checks include staged key release, chords split
 across keyboards, C: selection, accessories/configuration and deliberate Ctrl/Alt
 boot options (see [TODO](doc/rt68ice.md)). No FPGA rebuild is required.

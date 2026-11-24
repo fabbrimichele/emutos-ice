@@ -1,19 +1,23 @@
 # EmuTOS porting to rt68ice
 rt68ice is an FPGA single board computer based on 68000
 
+# Completed
+
+- Keyboard-triggered reset is implemented in `master`: wait for Ctrl, Alt,
+  right Shift and Delete to be released before restarting. Generic boot-option
+  handling remains unchanged. On 2026-11-24, the user confirmed it works and
+  also confirmed the restored standard welcome behavior: no welcome delay on
+  warm restart, three seconds on cold restart. No FPGA rebuild is needed.
+  Staged release, multi-keyboard chords and explicit boot-option/configuration
+  checks are optional additional validation, not remaining implementation work.
+
 # TODO
 
-- Complete keyboard-reset edge-case checks on the board. The RT68ICE keyboard reset
-  path now polls hardware USB reports until Ctrl, Alt, right Shift and Delete
-  are released across all keyboard ports, before starting either warm or cold
-  restart. Generic EmuTOS boot-option handling is unchanged. Check both reset
-  shortcuts, keys released in stages, and a chord split across keyboards.
-  Verify no welcome delay on warm restart and a three-second welcome countdown
-  on cold restart, plus C: selection, accessories and saved desktop
-  configuration; also verify deliberately pressing Ctrl/Alt during startup.
-  The image builds locally. On 2026-11-24, the user confirmed the restored
-  standard welcome behavior works on the board; the additional checks above
-  have not all been reported.
+- Next feature: DS3231 support in coordination with the RT68ICE I²C interface.
+  Update RTC read/write routines and expose temperature for diagnostics;
+  alarms and the module's EEPROM remain deferred. See the
+  [RT68ICE roadmap](https://github.com/fabbrimichele/rt68ice/blob/main/doc/TODOs.md)
+  for MIDI, CPU-mode, FreeMiNT, Doom and optional SDRAM-video work.
 
 The active device map is documented in
 [the RT68ICE port README](../readme-rt68ice.md#relocated-device-map).
@@ -24,5 +28,5 @@ high load address. Boot and 31.5 MiB ST-RAM were confirmed after a power cycle.
 YAARTTT completed six clean passes over `$00026AE8–$01F80000` by 55:55,
 with pass 7 continuing. One CoreMark run validated at 15.180265 iterations/sec,
 consistent with the previous performance baseline. Further peripheral,
-file-I/O, flash-boot and reset checks remain useful; the keyboard-reset boot
-modifier issue above is deferred to a separate branch.
+file-I/O, flash-boot and reset checks remain useful. The keyboard-reset fix and
+restored welcome defaults are now implemented in `master` as recorded above.
