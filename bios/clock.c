@@ -36,7 +36,7 @@
 #include "disk.h"
 #include "acsi.h"
 
-#if (CONF_WITH_MONSTER || CONF_WITH_IKBD_CLOCK)
+#if (CONF_WITH_MONSTER || CONF_WITH_IKBD_CLOCK || defined(MACHINE_RT68ICE))
 static UBYTE int2bcd(UWORD a)
 {
     return (a % 10) + ((a / 10) << 4);
@@ -90,26 +90,94 @@ static void extract_time(struct hms *out, UWORD time)
 #endif
 
 #ifdef MACHINE_RT68ICE
-/* RT68ICE maps the DS1302 registers on even addresses in the upper byte. */
-#define RT68ICE_RTC_SECONDS    0x00
-#define RT68ICE_RTC_MINUTES    0x02
-#define RT68ICE_RTC_HOURS      0x04
-#define RT68ICE_RTC_DAY        0x06
-#define RT68ICE_RTC_MONTH      0x08
-#define RT68ICE_RTC_WEEKDAY    0x0a
-#define RT68ICE_RTC_YEAR       0x0c
-#define RT68ICE_RTC_WP         0x0e
-#define RT68ICE_RTC_HALT       80      /* converted by FPGA to native CH=1 */
-#define RT68ICE_RTC_YEAR_BASE  20      /* RTC 00-99 represents 2000-2099 */
+/* Generic I2cDevice registers: word accesses, payloads in the low bits. */
+#define RT68ICE_I2C_CONTROL   (*(volatile UWORD *)(RT68ICE_I2C_BASE + 0x00))
+#define RT68ICE_I2C_ADDRESS   (*(volatile UWORD *)(RT68ICE_I2C_BASE + 0x02))
+#define RT68ICE_I2C_DATA      (*(volatile UWORD *)(RT68ICE_I2C_BASE + 0x04))
+#define RT68ICE_I2C_READ      0x01
+#define RT68ICE_I2C_LAST      0x02
+#define RT68ICE_I2C_TRIGGER   0x04
+#define RT68ICE_I2C_RESTART   0x08
+#define RT68ICE_I2C_BUSY      0x01
+#define RT68ICE_I2C_NACK      0x02
+#define RT68ICE_I2C_POLLS     100000UL
+#define RT68ICE_DS3231_ADDR   0x68
+#define RT68ICE_DS3231_CTRL   0x0e
+#define RT68ICE_DS3231_STATUS 0x0f
+#define RT68ICE_DS3231_EOSC   0x80
+#define RT68ICE_DS3231_OSF    0x80
+#define RT68ICE_RTC_YEAR_BASE 20      /* RTC 00-99 represents 2000-2099 */
 
-static UBYTE rt68ice_rtc_read(ULONG offset)
+static BOOL rt68ice_i2c_wait(BOOL busy)
 {
-    return *(volatile UBYTE *)(RT68ICE_RTC_BASE + offset);
+    ULONG polls;
+
+    for (polls = 0; polls < RT68ICE_I2C_POLLS; polls++)
+        if (((RT68ICE_I2C_CONTROL & RT68ICE_I2C_BUSY) != 0) == busy)
+            return TRUE;
+    return FALSE;
 }
 
-static void rt68ice_rtc_write(ULONG offset, UBYTE value)
+static BOOL rt68ice_i2c_command(UWORD command)
 {
-    *(volatile UBYTE *)(RT68ICE_RTC_BASE + offset) = value;
+    if (!rt68ice_i2c_wait(FALSE))
+        return FALSE;
+
+    RT68ICE_I2C_CONTROL = command | RT68ICE_I2C_TRIGGER;
+    /* BUSY=0 also means idle: first observe this command starting. */
+    if (!rt68ice_i2c_wait(TRUE) || !rt68ice_i2c_wait(FALSE))
+        return FALSE;
+
+    return (RT68ICE_I2C_CONTROL & RT68ICE_I2C_NACK) == 0;
+}
+
+static BOOL rt68ice_i2c_pointer(UBYTE reg)
+{
+    RT68ICE_I2C_ADDRESS = RT68ICE_DS3231_ADDR;
+    if (!rt68ice_i2c_command(0))
+        return FALSE;
+    RT68ICE_I2C_DATA = reg;
+    return rt68ice_i2c_command(0);
+}
+
+static BOOL rt68ice_i2c_read(UBYTE reg, UBYTE *data, UWORD count)
+{
+    UWORD i, command;
+
+    if (!rt68ice_i2c_pointer(reg) ||
+        !rt68ice_i2c_command(RT68ICE_I2C_RESTART | RT68ICE_I2C_READ))
+        return FALSE;
+
+    for (i = 0; i < count; i++)
+    {
+        command = RT68ICE_I2C_READ;
+        if (i == count - 1)
+            command |= RT68ICE_I2C_LAST;
+        if (!rt68ice_i2c_command(command))
+            return FALSE;
+        data[i] = (UBYTE)RT68ICE_I2C_DATA;
+    }
+    return TRUE;
+}
+
+static BOOL rt68ice_i2c_write(UBYTE reg, const UBYTE *data, UWORD count)
+{
+    UWORD i;
+
+    if (!rt68ice_i2c_pointer(reg))
+        return FALSE;
+    for (i = 0; i < count; i++)
+    {
+        RT68ICE_I2C_DATA = data[i];
+        if (!rt68ice_i2c_command(i == count - 1 ? RT68ICE_I2C_LAST : 0))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static BOOL rt68ice_rtc_valid_bcd(UBYTE value)
+{
+    return (value & 0x0f) <= 9 && (value >> 4) <= 9;
 }
 
 static BOOL rt68ice_rtc_valid_date(UWORD year, UWORD month, UWORD day)
@@ -153,69 +221,79 @@ static UBYTE rt68ice_rtc_weekday(UWORD year, UWORD month, UWORD day)
     return (UBYTE)((days + 5) % 7 + 1); /* 1 Jan 2000 was Saturday (6). */
 }
 
-/* Translate the RTC's 2000-2099 year into GEMDOS's 1980-based year. */
+/* DS3231 latches its calendar on START, so use one burst for a coherent date.
+ * Reads never clear OSF or write a default date into an uninitialized clock.
+ */
 static LONG rt68ice_rtc_getdt(void)
 {
     struct ymd date;
     struct hms time;
-    UBYTE seconds_before, seconds_after;
-    WORD tries;
+    UBYTE raw[16], hour;
 
-    /* Retry across a seconds rollover so fields come from one instant. */
-    for (tries = 0; tries < 3; tries++)
+    if (!rt68ice_i2c_read(0, raw, sizeof(raw)) ||
+        (raw[RT68ICE_DS3231_STATUS] & RT68ICE_DS3231_OSF) ||
+        (raw[5] & 0x80))            /* Century=1 is outside 2000-2099. */
+        return DEFAULT_DATETIME;
+
+    hour = raw[2] & ((raw[2] & 0x40) ? 0x1f : 0x3f);
+    if (!rt68ice_rtc_valid_bcd(raw[0]) || !rt68ice_rtc_valid_bcd(raw[1]) ||
+        !rt68ice_rtc_valid_bcd(hour) || !rt68ice_rtc_valid_bcd(raw[4]) ||
+        !rt68ice_rtc_valid_bcd(raw[5]) || !rt68ice_rtc_valid_bcd(raw[6]))
+        return DEFAULT_DATETIME;
+
+    time.second = bcd2int(raw[0]);
+    time.minute = bcd2int(raw[1]);
+    time.hour = bcd2int(hour);
+    if (raw[2] & 0x40)             /* Convert 12-hour mode, including noon. */
     {
-        seconds_before = rt68ice_rtc_read(RT68ICE_RTC_SECONDS);
-        time.minute = rt68ice_rtc_read(RT68ICE_RTC_MINUTES);
-        time.hour = rt68ice_rtc_read(RT68ICE_RTC_HOURS);
-        date.day = rt68ice_rtc_read(RT68ICE_RTC_DAY);
-        date.month = rt68ice_rtc_read(RT68ICE_RTC_MONTH);
-        date.year = rt68ice_rtc_read(RT68ICE_RTC_YEAR) + RT68ICE_RTC_YEAR_BASE;
-        seconds_after = rt68ice_rtc_read(RT68ICE_RTC_SECONDS);
-
-        if (seconds_before == seconds_after && seconds_after <= 59)
-        {
-            time.second = seconds_after;
-            if (time.minute <= 59 && time.hour <= 23 &&
-                rt68ice_rtc_valid_date(date.year + 1980, date.month, date.day))
-            {
-                return MAKE_ULONG(((date.year << 9) | (date.month << 5) | date.day),
-                                  ((time.hour << 11) | (time.minute << 5) | (time.second >> 1)));
-            }
-        }
+        if (time.hour < 1 || time.hour > 12)
+            return DEFAULT_DATETIME;
+        time.hour %= 12;
+        if (raw[2] & 0x20)
+            time.hour += 12;
     }
+    date.day = bcd2int(raw[4]);
+    date.month = bcd2int(raw[5]);
+    date.year = bcd2int(raw[6]) + RT68ICE_RTC_YEAR_BASE;
 
-    return DEFAULT_DATETIME;
+    if (time.second > 59 || time.minute > 59 || time.hour > 23 ||
+        raw[3] < 1 || raw[3] > 7 ||
+        !rt68ice_rtc_valid_date(date.year + 1980, date.month, date.day))
+        return DEFAULT_DATETIME;
+
+    return MAKE_ULONG(((date.year << 9) | (date.month << 5) | date.day),
+                     ((time.hour << 11) | (time.minute << 5) | (time.second >> 1)));
 }
 
 static void rt68ice_rtc_setdt(ULONG datetime)
 {
     struct ymd date;
     struct hms time;
-    UBYTE old_wp;
+    UBYTE raw[7], control[2];
 
     extract_date(&date, HIWORD(datetime));
     extract_time(&time, LOWORD(datetime));
-
-    /* The RTC stores 00-99 for 2000-2099; GEMDOS years 20-119 map there. */
     if (date.year < RT68ICE_RTC_YEAR_BASE || date.year > 119 ||
         !rt68ice_rtc_valid_date(date.year + 1980, date.month, date.day) ||
         time.hour > 23 || time.minute > 59 || time.second > 59)
         return;
 
-    old_wp = rt68ice_rtc_read(RT68ICE_RTC_WP);
-    rt68ice_rtc_write(RT68ICE_RTC_WP, 0);
-    /* Clear CH through the FPGA's documented binary-to-BCD conversion. */
-    rt68ice_rtc_write(RT68ICE_RTC_SECONDS, RT68ICE_RTC_HALT);
-    rt68ice_rtc_write(RT68ICE_RTC_MINUTES, time.minute);
-    rt68ice_rtc_write(RT68ICE_RTC_HOURS, time.hour);
-    rt68ice_rtc_write(RT68ICE_RTC_DAY, date.day);
-    rt68ice_rtc_write(RT68ICE_RTC_MONTH, date.month);
-    rt68ice_rtc_write(RT68ICE_RTC_WEEKDAY,
-                      rt68ice_rtc_weekday(date.year, date.month, date.day));
-    rt68ice_rtc_write(RT68ICE_RTC_YEAR, date.year - RT68ICE_RTC_YEAR_BASE);
-    /* Setting seconds last clears CH and starts the clock. */
-    rt68ice_rtc_write(RT68ICE_RTC_SECONDS, time.second);
-    rt68ice_rtc_write(RT68ICE_RTC_WP, old_wp);
+    raw[0] = int2bcd(time.second);
+    raw[1] = int2bcd(time.minute);
+    raw[2] = int2bcd(time.hour);     /* Always write 24-hour format. */
+    raw[3] = rt68ice_rtc_weekday(date.year, date.month, date.day);
+    raw[4] = int2bcd(date.day);
+    raw[5] = int2bcd(date.month);    /* Century bit clear for 2000-2099. */
+    raw[6] = int2bcd(date.year - RT68ICE_RTC_YEAR_BASE);
+
+    if (!rt68ice_i2c_write(0, raw, sizeof(raw)) ||
+        !rt68ice_i2c_read(RT68ICE_DS3231_CTRL, control, sizeof(control)))
+        return;
+
+    control[0] &= ~RT68ICE_DS3231_EOSC; /* Enable battery-backed oscillator. */
+    control[1] &= ~RT68ICE_DS3231_OSF;  /* Time is valid after setting it. */
+    control[1] |= 0x03;                /* Write 1 to preserve A1F/A2F. */
+    rt68ice_i2c_write(RT68ICE_DS3231_CTRL, control, sizeof(control));
 }
 #endif /* MACHINE_RT68ICE */
 
@@ -1284,7 +1362,7 @@ void clock_init(void)
 #ifdef MACHINE_RT68ICE
     else if (TRUE)
     {
-        /* The DS1302 is fixed hardware; it needs no separate initialization. */
+        /* The DS3231 is read through I2cDevice; do not change it at boot. */
     }
 #endif
 #ifdef MACHINE_AMIGA

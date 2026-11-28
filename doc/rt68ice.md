@@ -11,12 +11,22 @@ rt68ice is an FPGA single board computer based on 68000
   Staged release, multi-keyboard chords and explicit boot-option/configuration
   checks are optional additional validation, not remaining implementation work.
 
+- DS3231 BIOS clock driver implemented on `ds3231-rtc-driver`, replacing
+  DS1302 accesses with the matching RT68ICE I²C interface. It converts BCD
+  dates, checks OSF, and enables battery timekeeping when setting the date.
+  `make rt68ice` succeeds. A temporary TG68K simulation of the compiled
+  driver passed 13 cases covering reads, 12-hour conversion, set/readback,
+  leap day, invalid dates/BCD, OSF/century rejection and NACK/timeout fallback.
+  On 2026-11-28, the welcome screen showed the RTC time
+  `2026/11/28 17:22:40`; the user subsequently confirmed the hardware checks
+  worked after being asked to test clock setting, reset and power-cycle
+  retention. Standalone RTC tests also confirmed battery retention.
+
 # TODO
 
-- Next feature: DS3231 support in coordination with the RT68ICE I²C interface.
-  Update RTC read/write routines and expose temperature for diagnostics;
-  alarms and the module's EEPROM remain deferred. See the
-  [RT68ICE roadmap](https://github.com/fabbrimichele/rt68ice/blob/main/doc/TODOs.md)
+- An EmuTOS temperature API, RTC alarms and the module's EEPROM remain
+  deferred. Standalone temperature diagnostics are available in RT68ICE.
+  See the [RT68ICE roadmap](https://github.com/fabbrimichele/rt68ice/blob/main/doc/TODOs.md)
   for MIDI, CPU-mode, FreeMiNT, Doom and optional SDRAM-video work.
 
 The active device map is documented in
