@@ -13,9 +13,11 @@ Record application test results in the
 
 ## Relocated device map
 
-This branch matches rt68ice commit `effa82f` on `expand-memory-32mb`, which
-moves the framebuffer and devices above 32 MiB. It requires that relocated
-FPGA bitstream; images built here no longer use the legacy device addresses.
+This driver requires the DS3231/I²C FPGA interface from rt68ice commit
+`ecbabb5` on `ds3231-integration` ([PR #51](https://github.com/fabbrimichele/rt68ice/pull/51)).
+The framebuffer and devices are mapped above 32 MiB. The I²C controller
+replaces the DS1302 register interface at the same base address; this image
+is incompatible with the old DS1302 FPGA bitstream.
 
 | Device | New CPU address |
 | --- | ---: |
@@ -29,11 +31,14 @@ FPGA bitstream; images built here no longer use the legacy device addresses.
 | Timer / timer acknowledgement | `$0211C000` / `$0211C002` |
 | SD SPI controller | `$02120000` |
 | YM2149 PSG | `$02124000` |
-| DS1302 RTC | `$02128000` |
+| I²C controller (DS3231 at slave address `$68`) | `$02128000` |
 
 `include/rt68ice_mmap.h` supplies the shared bases for C drivers, assembly
-interrupt handlers and the framebuffer configuration. Register offsets,
-access widths, interrupt levels and SPI transfer sizes remain unchanged.
+interrupt handlers and the framebuffer configuration. The I²C controller uses
+16-bit accesses with payloads in the low bits: control/status at `+0`,
+slave address at `+2`, and transmit/receive data at `+4`.
+Other device register offsets, access widths, interrupt levels and SPI
+transfer sizes remain unchanged.
 Other EmuTOS targets retain their original maps.
 
 The EmuTOS payload now loads at `$01F80000`, with 31.5 MiB configured as
@@ -348,9 +353,23 @@ if the calculated value differs from the header.
 - Hardware reset button and three read-only DIP switches, with boot settings
   applied on reset (requires the matching FPGA design and monitor).
 - 200 Hz system timer.
-- DS1302 real-time clock used by the BIOS date/time calls. RTC years 2000–2099
-  map to the corresponding GEMDOS dates; set the clock with `Tsetdate`/`Tsettime`
-  or the monitor utility described in the RT68ICE DS1302 documentation.
+- DS3231 real-time clock used by the BIOS date/time calls through the I²C
+  controller. RTC years 2000–2099 map to the corresponding GEMDOS dates.
+  Reads support BCD calendar data in 12- or 24-hour mode; writes use 24-hour
+  mode. Set the clock through the desktop clock accessory, BIOS `Settime()`,
+  or GEMDOS `Tsetdate`/`Tsettime`.
+  Boot reads leave the RTC unchanged. If the oscillator-stop flag (OSF) is
+  set, the calendar is invalid, or I²C communication fails, reads return
+  EmuTOS's default date/time. Explicitly setting a valid date enables
+  battery-backed timekeeping and clears OSF while preserving alarm flags
+  and other control settings. Polling is bounded; after an I²C failure,
+  reset the FPGA before retrying because the controller has no software
+  abort command. Temperature diagnostics remain available in the standalone
+  RT68ICE utilities; alarms and the AT24C32 EEPROM are not used by EmuTOS.
+  See the [module and standalone test documentation](https://github.com/fabbrimichele/rt68ice/blob/ds3231-integration/doc/ds3231.md).
+  The standalone utilities passed board tests, including battery retention.
+  On 2026-11-28, EmuTOS displayed the RTC date/time at boot and the user
+  confirmed the subsequent clock-setting, reset and power-cycle checks worked.
 - PSG-compatible audio.
 
 ## SDRAM cache
